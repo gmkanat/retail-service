@@ -36,6 +36,6 @@ func main() {
 
 	log.Println("server starting")
 	if err := http.ListenAndServe(":8082", logMux); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
