@@ -10,6 +10,7 @@ func (s *CartService) AddItem(ctx context.Context, userId int64, skuId int64, co
 	if userId < 1 {
 		return customerrors.InvalidUserId
 	}
+
 	if skuId < 1 {
 		return customerrors.InvalidSkuId
 	}

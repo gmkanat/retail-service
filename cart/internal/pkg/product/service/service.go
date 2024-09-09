@@ -1,7 +1,6 @@
 package service
 
 import (
-	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/http/transport"
 	"net/http"
 )
 
@@ -16,14 +15,10 @@ type ProductService struct {
 	client  *http.Client
 }
 
-func NewProductService(baseURL, token string) *ProductService {
+func NewProductService(baseURL, token string, client *http.Client) *ProductService {
 	return &ProductService{
 		baseURL: baseURL,
 		token:   token,
-		client: &http.Client{
-			Transport: &transport.RetryRoundTripper{
-				Next: http.DefaultTransport,
-			},
-		},
+		client:  client,
 	}
 }
