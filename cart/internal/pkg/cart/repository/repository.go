@@ -6,12 +6,12 @@ import (
 )
 
 type CartStorageRepository struct {
-	cartStorage map[int64][]model.CartItem
+	cartStorage map[int64]map[int64]*model.CartItem
 	mutex       sync.RWMutex
 }
 
 func NewCartStorageRepository() *CartStorageRepository {
 	return &CartStorageRepository{
-		cartStorage: make(map[int64][]model.CartItem),
+		cartStorage: make(map[int64]map[int64]*model.CartItem),
 	}
 }

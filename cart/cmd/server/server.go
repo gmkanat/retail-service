@@ -1,33 +1,36 @@
 package main
 
 import (
-	server2 "gitlab.ozon.dev/kanat_9999/homework/cart/internal/app/server"
+	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/app/server"
+	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/config"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/http/middleware"
+	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/http/transport"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/repository"
-	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/service"
-	service2 "gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/product/service"
+	cartService "gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/service"
+	productService "gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/product/service"
 	"log"
 	"net/http"
 )
 
 func main() {
+	cfg := config.Load()
+
 	log.Println("app starting")
 
-	baseURL := "http://route256.pavl.uk:8080"
-	token := "testtoken"
-
-	productService := service2.NewProductService(baseURL, token)
+	retryTransport := transport.NewRetryRoundTripper(http.DefaultTransport, cfg.MaxRetries, cfg.InitialBackoff)
+	httpClient := &http.Client{Transport: retryTransport}
+	productSvc := productService.NewProductService(cfg.BaseURL, cfg.Token, httpClient)
 
 	cartRepository := repository.NewCartStorageRepository()
-	cartService := service.NewService(cartRepository, productService)
-	server := server2.New(cartService)
+	cartSvc := cartService.NewService(cartRepository, productSvc)
+	srv := server.New(cartSvc)
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /user/{userId}/cart/{skuId}", server.AddItem)
-	mux.HandleFunc("GET /user/{userId}/cart", server.GetCart)
-	mux.HandleFunc("DELETE /user/{userId}/cart/{skuId}", server.RemoveItem)
-	mux.HandleFunc("DELETE /user/{userId}/cart", server.ClearCart)
+	mux.HandleFunc("POST /user/{userId}/cart/{skuId}", srv.AddItem)
+	mux.HandleFunc("GET /user/{userId}/cart", srv.GetCart)
+	mux.HandleFunc("DELETE /user/{userId}/cart/{skuId}", srv.RemoveItem)
+	mux.HandleFunc("DELETE /user/{userId}/cart", srv.ClearCart)
 
 	logMux := middleware.LogMiddleware(mux)
 

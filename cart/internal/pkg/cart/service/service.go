@@ -13,6 +13,10 @@ type CartRepository interface {
 	ClearCart(_ context.Context, userId int64) error
 }
 
+type ProductService interface {
+	GetProduct(ctx context.Context, skuID int64) (*service.Product, error)
+}
+
 type CartService struct {
 	repository     CartRepository
 	productService service.ProductService
