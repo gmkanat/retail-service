@@ -19,12 +19,12 @@ type ProductService interface {
 
 type CartService struct {
 	repository     CartRepository
-	productService service.ProductService
+	productService ProductService
 }
 
-func NewService(repository CartRepository, service *service.ProductService) *CartService {
+func NewService(repository CartRepository, productService ProductService) *CartService {
 	return &CartService{
 		repository:     repository,
-		productService: *service,
+		productService: productService,
 	}
 }
