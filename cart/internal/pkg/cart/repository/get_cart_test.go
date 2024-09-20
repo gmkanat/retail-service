@@ -2,10 +2,11 @@ package repository_test
 
 import (
 	"context"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/model"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/repository"
-	"testing"
 )
 
 func TestCartStorageRepository_GetCart(t *testing.T) {
@@ -20,18 +21,25 @@ func TestCartStorageRepository_GetCart(t *testing.T) {
 		Price: 200,
 	}
 
-	items, err := repo.GetCart(ctx, userId)
-	require.Len(t, items, 0)
-	require.NoError(t, err)
-	require.Empty(t, items)
+	t.Run("get empty cart", func(t *testing.T) {
+		items, err := repo.GetCart(ctx, userId)
+		require.NoError(t, err)
+		require.Len(t, items, 0)
+	})
 
-	err = repo.AddItem(ctx, userId, cartItem)
-	require.NoError(t, err)
+	t.Run("add item to cart", func(t *testing.T) {
+		err := repo.AddItem(ctx, userId, cartItem)
+		require.NoError(t, err)
+	})
 
-	items, err = repo.GetCart(ctx, userId)
-	require.NoError(t, err)
-	require.NotEmpty(t, items)
-	require.Equal(t, 1, len(items))
-	require.Equal(t, cartItem.SkuId, items[0].SkuId)
-	require.Equal(t, cartItem.Name, items[0].Name)
+	t.Run("get cart after adding item", func(t *testing.T) {
+		items, err := repo.GetCart(ctx, userId)
+		require.NoError(t, err)
+		require.NotEmpty(t, items)
+		require.Len(t, items, 1)
+		require.Equal(t, cartItem.SkuId, items[0].SkuId)
+		require.Equal(t, cartItem.Name, items[0].Name)
+		require.Equal(t, cartItem.Count, items[0].Count)
+		require.Equal(t, cartItem.Price, items[0].Price)
+	})
 }

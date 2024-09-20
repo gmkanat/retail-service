@@ -2,10 +2,11 @@ package repository_test
 
 import (
 	"context"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/model"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/repository"
-	"testing"
 )
 
 func TestCartStorageRepository_RemoveItem(t *testing.T) {
@@ -21,18 +22,25 @@ func TestCartStorageRepository_RemoveItem(t *testing.T) {
 		Price: 200,
 	}
 
-	err := repo.AddItem(ctx, userId, cartItem)
-	require.NoError(t, err)
+	t.Run("add item to cart", func(t *testing.T) {
+		err := repo.AddItem(ctx, userId, cartItem)
+		require.NoError(t, err)
+	})
 
-	items, err := repo.GetCart(ctx, userId)
-	require.NoError(t, err)
-	require.Len(t, items, 1)
+	t.Run("verify item in cart before removal", func(t *testing.T) {
+		items, err := repo.GetCart(ctx, userId)
+		require.NoError(t, err)
+		require.Len(t, items, 1)
+	})
 
-	err = repo.RemoveItem(ctx, userId, skuId)
-	require.NoError(t, err)
+	t.Run("remove item from cart", func(t *testing.T) {
+		err := repo.RemoveItem(ctx, userId, skuId)
+		require.NoError(t, err)
+	})
 
-	items, err = repo.GetCart(ctx, userId)
-	require.Len(t, items, 0)
-	require.NoError(t, err)
-	require.Empty(t, items)
+	t.Run("verify cart is empty", func(t *testing.T) {
+		items, err := repo.GetCart(ctx, userId)
+		require.NoError(t, err)
+		require.Len(t, items, 0)
+	})
 }
