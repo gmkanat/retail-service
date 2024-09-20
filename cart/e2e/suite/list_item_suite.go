@@ -1,36 +1,43 @@
 package suite
 
 import (
-	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/stretchr/testify/suite"
+	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/app/server"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/model"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/repository"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/service"
 	productService "gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/product/service"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 )
 
 type ListItemSuite struct {
 	suite.Suite
-	cartService *service.CartService
+	server *server.Server
+	router http.Handler
 }
 
 func (s *ListItemSuite) SetupSuite() {
 	repo := repository.NewCartStorageRepository()
 	productSvc := productService.NewProductService("http://route256.pavl.uk:8080", "testtoken", &http.Client{})
-	s.cartService = service.NewService(repo, productSvc)
+	cartSvc := service.NewService(repo, productSvc)
+	srv := server.New(cartSvc)
+	s.router = setupRouter(srv)
 }
 
 func (s *ListItemSuite) TestListItem() {
-	ctx := context.Background()
-
 	userId := int64(123)
+
 	item1 := model.CartItem{
 		SkuId: 773297411,
 		Count: 2,
 		Name:  "Кроссовки Nike JORDAN",
 		Price: 2202,
 	}
+	s.addItemToCart(userId, item1)
 
 	item2 := model.CartItem{
 		SkuId: 3596599,
@@ -38,21 +45,41 @@ func (s *ListItemSuite) TestListItem() {
 		Name:  "Невербальная коммуникация. Психология и право",
 		Price: 3386,
 	}
+	s.addItemToCart(userId, item2)
 
-	err := s.cartService.AddItem(ctx, userId, item1.SkuId, item1.Count)
+	s.verifyCartContent(userId, []model.CartItem{item1, item2})
+}
+
+func (s *ListItemSuite) addItemToCart(userID int64, item model.CartItem) {
+	url := fmt.Sprintf("/user/%d/cart/%d", userID, item.SkuId)
+	body := strings.NewReader(fmt.Sprintf(`{"count": %d}`, item.Count))
+	req, err := http.NewRequest(http.MethodPost, url, body)
 	s.Require().NoError(err)
 
-	items, err := s.cartService.GetCart(ctx, userId)
-	s.Require().NoError(err)
-	s.Require().Len(items.Items, 1)
+	rr := httptest.NewRecorder()
+	s.router.ServeHTTP(rr, req)
+	s.Require().Equal(http.StatusOK, rr.Code, "Failed to add item to cart")
+}
 
-	err = s.cartService.AddItem(ctx, userId, item2.SkuId, item2.Count)
+func (s *ListItemSuite) verifyCartContent(userID int64, expectedItems []model.CartItem) {
+	url := fmt.Sprintf("/user/%d/cart", userID)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	s.Require().NoError(err)
 
-	items, err = s.cartService.GetCart(ctx, userId)
+	rr := httptest.NewRecorder()
+	s.router.ServeHTTP(rr, req)
+	s.Require().Equal(http.StatusOK, rr.Code, "failed to list cart")
+
+	var response model.GetCartResponse
+	err = json.NewDecoder(rr.Body).Decode(&response)
 	s.Require().NoError(err)
-	s.Require().Len(items.Items, 2)
-	s.Require().Equal(item1, items.Items[0])
-	s.Require().Equal(item2, items.Items[1])
-	s.Require().Equal(item1.Price*uint32(item1.Count)+item2.Price*uint32(item2.Count), items.TotalPrice)
+	s.Require().Len(response.Items, len(expectedItems), "unexpected number of items in the cart")
+
+	totalPrice := uint32(0)
+	for i, item := range expectedItems {
+		s.Require().Equal(item, response.Items[i], "item mismatch")
+		totalPrice += item.Price * uint32(item.Count)
+	}
+
+	s.Require().Equal(totalPrice, response.TotalPrice, "price mismatch")
 }

@@ -9,13 +9,19 @@ test-cover:
 test-e2e:
 	go test ./e2e/... -v
 
+install-gocyclo:
+	go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+
+install-gocognit:
+	go install github.com/uudashr/gocognit/cmd/gocognit@latest
+
 cyclo:
 	gocyclo -over $(CYCLO_LIMIT) -ignore "_mock.go" ./
 
 cognit:
 	gocognit -over $(COGNIT_LIMIT) -ignore "_mock.go" ./
 
-lint: cyclo cognit
+lint: install-gocyclo install-gocognit cyclo cognit
 
 bench:
 	go test ./internal/pkg/cart/repository -bench=. -benchmem
