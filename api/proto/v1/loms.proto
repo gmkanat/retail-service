@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+import "validate/validate.proto";
+import "google/api/annotations.proto";
+
+option go_package = "gitlab.ozon.dev/kanat_99999/homework/loms/pkg/api/loms/v1;loms";
+
+service Loms {
+    rpc OrderCreate(OrderCreateRequest) returns (OrderCreateResponse) {
+        option(google.api.http) = {
+            post: "/v1/order/create"
+            body: "info"
+        };
+    }
+    rpc OrderInfo(OrderInfoRequest) returns (OrderInfoResponse) {
+        option (google.api.http) = {
+            get: "/v1/order/{order_id}/info"
+        };
+    }
+    rpc OrderPay(OrderPayRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            post: "/v1/order/{order_id}/pay"
+        };
+    }
+    rpc OrderCancel(OrderCancelRequest) returns (google.protobuf.Empty) {
+        option (google.api.http) = {
+            post: "/v1/order/{order_id}/cancel"
+        };
+    }
+    rpc StocksInfo(StocksInfoRequest) returns (StocksInfoResponse) {
+        option (google.api.http) = {
+            get: "/v1/stocks/{sku}/info"
+        };
+    }
+}
+
+message OrderCreateRequest {
+    int64 user_id = 1 [(validate.rules).int64.gt = 0];
+    OrderInfo info = 2 [(validate.rules).message.required = true];
+}
+
+message OrderInfo {
+    repeated Item items = 2 [(validate.rules).repeated = {
+        min_items: 1
+        max_items: 200
+    }];
+}
+
+message OrderCreateResponse {
+    int64 order_id = 1 [(validate.rules).int64.gt = 0];
+}
+
+message OrderInfoRequest {
+    int64 order_id = 1 [(validate.rules).int64.gt = 0];
+}
+
+message OrderInfoResponse {
+    string status = 1;
+    int64 user = 2;
+    repeated Item items = 3;
+}
+
+message OrderPayRequest {
+    int64 order_id = 1 [(validate.rules).int64.gt = 0];
+}
+
+message OrderCancelRequest {
+    int64 order_id = 1 [(validate.rules).int64.gt = 0];
+}
+
+message StocksInfoRequest {
+    uint32 sku = 1 [(validate.rules).uint32.gt = 0];
+}
+
+message StocksInfoResponse {
+    int64 available_count = 1 [(validate.rules).int64.gt = 0];
+}
+
+message Item {
+    uint32 sku = 1 [(validate.rules).uint32.gt = 0];
+    uint32 count = 2 [(validate.rules).uint32.gt = 0];
+}
