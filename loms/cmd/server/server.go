@@ -7,6 +7,7 @@ import (
 	stockRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository/stock"
 	orderService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/order"
 	stockService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/stock"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/middleware"
 	proto "gitlab.ozon.dev/kanat_9999/homework/loms/pkg/api/proto/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -33,7 +34,9 @@ func main() {
 		log.Fatalf("failed to listen on port %s: %v", cfg.Port, err)
 	}
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(middleware.LoggingInterceptor),
+	)
 
 	reflection.Register(grpcServer)
 
