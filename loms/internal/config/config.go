@@ -5,14 +5,20 @@ import (
 )
 
 type AppConfig struct {
-	Port      string `json:"port"`
+	GRPCPort  string `json:"grpc_port"`
+	HTTPPort  string `json:"http_port"`
 	StockFile string `json:"stock_file"`
 }
 
 func Load() *AppConfig {
-	port := os.Getenv("LOMS_PORT")
-	if port == "" {
-		port = ":50051"
+	grpcPort := os.Getenv("LOMS_GRPC_PORT")
+	if grpcPort == "" {
+		grpcPort = ":50051"
+	}
+
+	httpPort := os.Getenv("LOMS_HTTP_PORT")
+	if httpPort == "" {
+		httpPort = ":8082"
 	}
 
 	stockFile := os.Getenv("LOMS_STOCK_FILE")
@@ -21,7 +27,8 @@ func Load() *AppConfig {
 	}
 
 	return &AppConfig{
-		Port:      port,
+		GRPCPort:  grpcPort,
+		HTTPPort:  httpPort,
 		StockFile: stockFile,
 	}
 }
