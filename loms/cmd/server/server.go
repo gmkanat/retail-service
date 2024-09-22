@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/app"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/config"
 	orderRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository/order"
@@ -67,9 +68,19 @@ func main() {
 		log.Fatalf("failed to register gateway: %v", err)
 	}
 
+	httpMux := http.NewServeMux()
+
+	httpMux.Handle("/swagger/", httpSwagger.WrapHandler)
+
+	httpMux.HandleFunc("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, cfg.SwaggerFile)
+	})
+
+	httpMux.Handle("/", middleware.LogMiddleware(gwmux))
+
 	gwServer := &http.Server{
 		Addr:    cfg.HTTPPort,
-		Handler: middleware.LogMiddleware(gwmux),
+		Handler: httpMux,
 	}
 
 	log.Printf("LOMS HTTP server running on port %s\n", cfg.HTTPPort)

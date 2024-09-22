@@ -5,9 +5,10 @@ import (
 )
 
 type AppConfig struct {
-	GRPCPort  string `json:"grpc_port"`
-	HTTPPort  string `json:"http_port"`
-	StockFile string `json:"stock_file"`
+	GRPCPort    string `json:"grpc_port"`
+	HTTPPort    string `json:"http_port"`
+	StockFile   string `json:"stock_file"`
+	SwaggerFile string `json:"swagger_file"`
 }
 
 func Load() *AppConfig {
@@ -25,10 +26,15 @@ func Load() *AppConfig {
 	if stockFile == "" {
 		stockFile = "internal/config/stock-data.json"
 	}
+	swaggerFile := os.Getenv("LOMS_SWAGGER_FILE")
+	if swaggerFile == "" {
+		swaggerFile = "../api/openapiv2/loms.swagger.json"
+	}
 
 	return &AppConfig{
-		GRPCPort:  grpcPort,
-		HTTPPort:  httpPort,
-		StockFile: stockFile,
+		GRPCPort:    grpcPort,
+		HTTPPort:    httpPort,
+		StockFile:   stockFile,
+		SwaggerFile: swaggerFile,
 	}
 }
