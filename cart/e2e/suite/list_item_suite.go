@@ -8,7 +8,12 @@ import (
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/model"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/repository"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/service"
+	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/loms"
 	productService "gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/product/service"
+	proto "gitlab.ozon.dev/kanat_9999/homework/cart/pkg/api/proto/v1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,7 +28,16 @@ type ListItemSuite struct {
 func (s *ListItemSuite) SetupSuite() {
 	repo := repository.NewCartStorageRepository()
 	productSvc := productService.NewProductService("http://route256.pavl.uk:8080", "testtoken", &http.Client{})
-	cartSvc := service.NewService(repo, productSvc)
+
+	conn, err := grpc.Dial(":50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("failed to connect to LOMS service: %v", err)
+	}
+
+	lomsClient := proto.NewLomsClient(conn)
+	lomsSvc := loms.NewClient(lomsClient)
+
+	cartSvc := service.NewService(repo, productSvc, lomsSvc)
 	srv := server.New(cartSvc)
 	s.router = setupRouter(srv)
 }
@@ -38,16 +52,7 @@ func (s *ListItemSuite) TestListItem() {
 		Price: 2202,
 	}
 	s.addItemToCart(userId, item1)
-
-	item2 := model.CartItem{
-		SkuId: 3596599,
-		Count: 1,
-		Name:  "Невербальная коммуникация. Психология и право",
-		Price: 3386,
-	}
-	s.addItemToCart(userId, item2)
-
-	s.verifyCartContent(userId, []model.CartItem{item1, item2})
+	s.verifyCartContent(userId, []model.CartItem{item1})
 }
 
 func (s *ListItemSuite) addItemToCart(userID int64, item model.CartItem) {

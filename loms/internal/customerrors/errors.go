@@ -8,4 +8,6 @@ var (
 	ErrStockNotFound          = errors.New("stock not found")
 	ErrNotEnoughReservedStock = errors.New("not enough reserved stock")
 	ErrInsufficientStock      = errors.New("insufficient stock")
+	ErrInvalidOrderId         = errors.New("invalid order id")
+	ErrInvalidUserId          = errors.New("invalid user id")
 )

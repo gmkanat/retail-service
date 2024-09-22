@@ -19,8 +19,8 @@ func TestCartService_AddItem(t *testing.T) {
 
 	repoMock := mocks.NewCartRepositoryMock(mc)
 	productMock := mocks.NewProductServiceMock(mc)
-
-	cartService := service.NewService(repoMock, productMock, nil)
+	lomsClientMock := mocks.NewLomsClientMock(mc)
+	cartService := service.NewService(repoMock, productMock, lomsClientMock)
 
 	ctx := context.Background()
 
@@ -55,10 +55,11 @@ func TestCartService_AddItem(t *testing.T) {
 			Name:  "Кроссовки Nike JORDAN",
 			Price: 200,
 		}
-		productMock.GetProductMock.Expect(ctx, int64(1000)).Return(&product, nil)
+		productMock.GetProductMock.Expect(ctx, int64(1002)).Return(&product, nil)
+		lomsClientMock.GetStockMock.Expect(ctx, int64(1002)).Return(int64(10), nil)
 
 		cartItem := &model.CartItem{
-			SkuId: 1000,
+			SkuId: 1002,
 			Name:  "Кроссовки Nike JORDAN",
 			Count: 2,
 			Price: 200,
@@ -66,7 +67,7 @@ func TestCartService_AddItem(t *testing.T) {
 
 		repoMock.AddItemMock.Expect(ctx, int64(123), cartItem).Return(nil)
 
-		err := cartService.AddItem(ctx, 123, 1000, 2)
+		err := cartService.AddItem(ctx, 123, 1002, 2)
 		require.NoError(t, err)
 	})
 }

@@ -8,6 +8,10 @@ import (
 )
 
 func (s *Service) OrderCreate(ctx context.Context, userID int64, items []model.Item) (int64, error) {
+	if userID <= 0 {
+		return 0, customerrors.ErrInvalidUserId
+	}
+
 	orderID, err := s.orderRepository.Create(ctx, userID, items)
 	if err != nil {
 		return 0, err

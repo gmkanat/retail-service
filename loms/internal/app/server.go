@@ -52,6 +52,9 @@ func (s *Service) OrderCreate(ctx context.Context, req *servicepb.OrderCreateReq
 		if errors.Is(err, customerrors.ErrOrderStatusFailed) {
 			return nil, status.Errorf(codes.FailedPrecondition, "failed to create order")
 		}
+		if errors.Is(err, customerrors.ErrInvalidUserId) {
+			return nil, status.Errorf(codes.FailedPrecondition, "invalid user ID")
+		}
 		return nil, status.Errorf(codes.Internal, "failed to create order")
 	}
 
@@ -63,6 +66,9 @@ func (s *Service) OrderInfo(ctx context.Context, req *servicepb.OrderInfoRequest
 	if err != nil {
 		if errors.Is(err, customerrors.ErrOrderNotFound) {
 			return nil, status.Errorf(codes.NotFound, "order not found")
+		}
+		if errors.Is(err, customerrors.ErrInvalidOrderId) {
+			return nil, status.Errorf(codes.FailedPrecondition, "invalid order ID")
 		}
 		return nil, status.Errorf(codes.Internal, "failed to get order info")
 	}
@@ -85,6 +91,9 @@ func (s *Service) OrderInfo(ctx context.Context, req *servicepb.OrderInfoRequest
 func (s *Service) OrderPay(ctx context.Context, req *servicepb.OrderPayRequest) (*emptypb.Empty, error) {
 	err := s.orderService.OrderPay(ctx, req.OrderId)
 	if err != nil {
+		if errors.Is(err, customerrors.ErrInvalidOrderId) {
+			return nil, status.Errorf(codes.FailedPrecondition, "invalid order ID")
+		}
 		return nil, err
 	}
 
@@ -94,6 +103,9 @@ func (s *Service) OrderPay(ctx context.Context, req *servicepb.OrderPayRequest) 
 func (s *Service) OrderCancel(ctx context.Context, req *servicepb.OrderCancelRequest) (*emptypb.Empty, error) {
 	err := s.orderService.OrderCancel(ctx, req.OrderId)
 	if err != nil {
+		if errors.Is(err, customerrors.ErrInvalidOrderId) {
+			return nil, status.Errorf(codes.FailedPrecondition, "invalid order ID")
+		}
 		return nil, err
 	}
 
