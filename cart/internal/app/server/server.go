@@ -10,6 +10,7 @@ type CartService interface {
 	RemoveItem(ctx context.Context, userId int64, skuId int64) error
 	GetCart(ctx context.Context, userId int64) (*model.GetCartResponse, error)
 	ClearCart(ctx context.Context, userId int64) error
+	Checkout(ctx context.Context, userId int64) (orderId int64, error error)
 }
 
 type Server struct {

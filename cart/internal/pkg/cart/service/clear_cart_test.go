@@ -15,7 +15,7 @@ import (
 func TestCartService_ClearCart(t *testing.T) {
 	mc := minimock.NewController(t)
 	repoMock := mocks.NewCartRepositoryMock(mc)
-	cartService := service.NewService(repoMock, nil)
+	cartService := service.NewService(repoMock, nil, nil)
 
 	ctx := context.Background()
 	userID := int64(123)

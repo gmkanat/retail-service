@@ -24,6 +24,15 @@ func (s *CartService) AddItem(ctx context.Context, userId int64, skuId int64, co
 		return err
 	}
 
+	stockCount, err := s.lomsClient.GetStock(ctx, skuId)
+	if err != nil {
+		return err
+	}
+
+	if stockCount < int64(count) {
+		return customerrors.NotEnoughStock
+	}
+
 	cartItem := &model.CartItem{
 		SkuId: skuId,
 		Name:  product.Name,

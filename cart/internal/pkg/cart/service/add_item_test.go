@@ -20,7 +20,7 @@ func TestCartService_AddItem(t *testing.T) {
 	repoMock := mocks.NewCartRepositoryMock(mc)
 	productMock := mocks.NewProductServiceMock(mc)
 
-	cartService := service.NewService(repoMock, productMock)
+	cartService := service.NewService(repoMock, productMock, nil)
 
 	ctx := context.Background()
 

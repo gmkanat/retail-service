@@ -65,30 +65,47 @@ vendor-proto/protoc-gen-openapiv2/options:
 
 
 PROTO_PATH:="api/proto/v1"
+OUT_DIR_LOMS := loms/pkg/$(PROTO_PATH)
+OUT_DIR_CART := cart/pkg/$(PROTO_PATH)
+OPENAPI_DIR := api/openapiv2
 
-
-.PHONY: .protoc-generate
-.protoc-generate:
-	mkdir -p api/openapiv2
+# Common protoc generation rule func
+define protoc_generate
+	mkdir -p $(OPENAPI_DIR)
 	protoc \
-	-I ${PROTO_PATH} \
+	-I $(PROTO_PATH) \
 	-I vendor-proto \
 	--plugin=protoc-gen-go=$(LOCAL_BIN)/protoc-gen-go \
-	--go_out loms/pkg/${PROTO_PATH} \
+	--go_out $(1) \
 	--go_opt paths=source_relative \
 	--plugin=protoc-gen-go-grpc=$(LOCAL_BIN)/protoc-gen-go-grpc \
-	--go-grpc_out loms/pkg/${PROTO_PATH} \
-    --go-grpc_opt paths=source_relative \
-    --plugin=protoc-gen-validate=$(LOCAL_BIN)/protoc-gen-validate \
-    --validate_out="lang=go,paths=source_relative:loms/pkg/api/proto/v1" \
-    --plugin=protoc-gen-grpc-gateway=$(LOCAL_BIN)/protoc-gen-grpc-gateway \
-    --grpc-gateway_out loms/pkg/${PROTO_PATH} \
-    --grpc-gateway_opt logtostderr=true --grpc-gateway_opt paths=source_relative --grpc-gateway_opt generate_unbound_methods=true \
-    --plugin=protoc-gen-openapiv2=$(LOCAL_BIN)/protoc-gen-openapiv2 \
-    --openapiv2_out api/openapiv2 \
-    --openapiv2_opt logtostderr=true \
-	api/proto/v1/loms.proto \
+	--go-grpc_out $(1) \
+	--go-grpc_opt paths=source_relative \
+	--plugin=protoc-gen-validate=$(LOCAL_BIN)/protoc-gen-validate \
+	--validate_out="lang=go,paths=source_relative:$(1)" \
+	--plugin=protoc-gen-grpc-gateway=$(LOCAL_BIN)/protoc-gen-grpc-gateway \
+	--grpc-gateway_out $(1) \
+	--grpc-gateway_opt logtostderr=true \
+	--grpc-gateway_opt paths=source_relative \
+	--grpc-gateway_opt generate_unbound_methods=true \
+	--plugin=protoc-gen-openapiv2=$(LOCAL_BIN)/protoc-gen-openapiv2 \
+	--openapiv2_out $(OPENAPI_DIR) \
+	--openapiv2_opt logtostderr=true \
+	$(PROTO_PATH)/loms.proto
+endef
 
+.PHONY: .protoc-generate-loms
+.protoc-generate-loms:
+	mkdir -p $(OUT_DIR_LOMS)
+	$(call protoc_generate,$(OUT_DIR_LOMS))
+
+.PHONY: .protoc-generate-cart
+.protoc-generate-cart:
+	mkdir -p $(OUT_DIR_CART)
+	$(call protoc_generate,$(OUT_DIR_CART))
+
+.PHONY: .protoc-generate
+.protoc-generate: .protoc-generate-loms .protoc-generate-cart
 
 .PHONY: .serve-swagger
 .serve-swagger:
