@@ -2,7 +2,7 @@ package stock
 
 import (
 	"context"
-	"errors"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/customerrors"
 )
 
 func (r *Repository) GetBySKU(ctx context.Context, sku uint32) (uint64, error) {
@@ -11,7 +11,7 @@ func (r *Repository) GetBySKU(ctx context.Context, sku uint32) (uint64, error) {
 
 	stock, ok := r.stocks[sku]
 	if !ok {
-		return 0, errors.New("stock not found")
+		return 0, customerrors.ErrStockNotFound
 	}
 
 	return stock.TotalCount - stock.Reserved, nil

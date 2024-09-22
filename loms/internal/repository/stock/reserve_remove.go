@@ -2,7 +2,7 @@ package stock
 
 import (
 	"context"
-	"errors"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/customerrors"
 )
 
 func (r *Repository) ReserveRemove(ctx context.Context, sku uint32, count uint16) error {
@@ -11,11 +11,11 @@ func (r *Repository) ReserveRemove(ctx context.Context, sku uint32, count uint16
 
 	stock, ok := r.stocks[sku]
 	if !ok {
-		return errors.New("stock not found")
+		return customerrors.ErrStockNotFound
 	}
 
 	if stock.TotalCount-stock.Reserved < uint64(count) {
-		return errors.New("insufficient stock")
+		return customerrors.ErrInsufficientStock
 	}
 
 	stock.TotalCount -= uint64(count)

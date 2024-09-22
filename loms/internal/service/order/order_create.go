@@ -2,6 +2,7 @@ package order
 
 import (
 	"context"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/customerrors"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/model"
 	"log"
 )
@@ -17,7 +18,7 @@ func (s *Service) OrderCreate(ctx context.Context, userID int64, items []model.I
 	for _, item := range items {
 		reserveStockErr := s.stockRepository.Reserve(ctx, item.SKU, item.Count)
 		if reserveStockErr != nil {
-			log.Printf("failed to reserve stock for order %d: %v", orderID, err)
+			log.Printf("failed to reserve stock for order %d: %v", orderID, reserveStockErr)
 
 			// rollback stock reservation
 			for _, reservedItem := range reservedItems {
@@ -31,7 +32,7 @@ func (s *Service) OrderCreate(ctx context.Context, userID int64, items []model.I
 			if updateOrderErr != nil {
 				log.Printf("failed to update order status to failed: %v", updateOrderErr)
 			}
-			return orderID, err
+			return orderID, customerrors.ErrOrderStatusFailed
 		}
 		reservedItems = append(reservedItems, item)
 	}

@@ -2,7 +2,7 @@ package stock
 
 import (
 	"context"
-	"errors"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/customerrors"
 )
 
 func (r *Repository) Release(ctx context.Context, sku uint32, count uint16) error {
@@ -11,11 +11,11 @@ func (r *Repository) Release(ctx context.Context, sku uint32, count uint16) erro
 
 	stock, ok := r.stocks[sku]
 	if !ok {
-		return errors.New("stock not found")
+		return customerrors.ErrStockNotFound
 	}
 
 	if stock.Reserved < uint64(count) {
-		return errors.New("not enough reserved stock")
+		return customerrors.ErrNotEnoughReservedStock
 	}
 
 	stock.Reserved -= uint64(count)

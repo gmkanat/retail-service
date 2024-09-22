@@ -1,7 +1,5 @@
 package model
 
-import "fmt"
-
 type OrderStatus int
 
 const (
@@ -26,22 +24,5 @@ func (s OrderStatus) String() string {
 		return "cancelled"
 	default:
 		return "unknown"
-	}
-}
-
-func ParseOrderStatus(status string) (OrderStatus, error) {
-	switch status {
-	case "new":
-		return OrderStatusNew, nil
-	case "awaiting payment":
-		return OrderStatusAwaitingPayment, nil
-	case "failed":
-		return OrderStatusFailed, nil
-	case "payed":
-		return OrderStatusPayed, nil
-	case "cancelled":
-		return OrderStatusCancelled, nil
-	default:
-		return -1, fmt.Errorf("invalid order status: %s", status)
 	}
 }
