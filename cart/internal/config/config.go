@@ -11,7 +11,7 @@ type Config struct {
 	BaseURL        string
 	LomsAddr       string
 	Token          string
-	Port           string
+	PortAddr       string
 	MaxRetries     int
 	InitialBackoff time.Duration
 }
@@ -52,7 +52,7 @@ func Load() *Config {
 	return &Config{
 		BaseURL:        baseURL,
 		Token:          token,
-		Port:           port,
+		PortAddr:       port,
 		MaxRetries:     maxRetries,
 		InitialBackoff: initialBackoff,
 		LomsAddr:       lomsAddr,

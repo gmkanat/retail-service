@@ -49,7 +49,8 @@ func main() {
 	logMux := middleware.LogMiddleware(mux)
 
 	log.Println("server starting")
-	if err := http.ListenAndServe(":8083", logMux); err != nil {
+
+	if err := http.ListenAndServe(cfg.PortAddr, logMux); err != nil {
 		log.Fatal(err)
 	}
 }
