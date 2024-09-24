@@ -94,6 +94,9 @@ func (s *Service) OrderPay(ctx context.Context, req *servicepb.OrderPayRequest) 
 		if errors.Is(err, customerrors.ErrInvalidOrderId) {
 			return nil, status.Errorf(codes.FailedPrecondition, "invalid order ID")
 		}
+		if errors.Is(err, customerrors.ErrOrderStatusAwaitingPayment) {
+			return nil, status.Errorf(codes.FailedPrecondition, "order status is not awaiting payment")
+		}
 		return nil, err
 	}
 
@@ -105,6 +108,9 @@ func (s *Service) OrderCancel(ctx context.Context, req *servicepb.OrderCancelReq
 	if err != nil {
 		if errors.Is(err, customerrors.ErrInvalidOrderId) {
 			return nil, status.Errorf(codes.FailedPrecondition, "invalid order ID")
+		}
+		if errors.Is(err, customerrors.ErrOrderStatusAwaitingPayment) {
+			return nil, status.Errorf(codes.FailedPrecondition, "order status is not awaiting payment")
 		}
 		return nil, err
 	}

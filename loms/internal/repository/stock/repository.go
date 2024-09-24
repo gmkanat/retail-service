@@ -11,7 +11,7 @@ type Repository struct {
 }
 
 func NewStockRepository(initialData []model.Stock) *Repository {
-	stocks := make(map[uint32]*model.Stock)
+	stocks := make(map[uint32]*model.Stock, 8)
 	for _, stock := range initialData {
 		stocks[stock.SKU] = &stock
 	}

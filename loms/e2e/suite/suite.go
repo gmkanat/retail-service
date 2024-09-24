@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/stretchr/testify/suite"
 	loms "gitlab.ozon.dev/kanat_9999/homework/cart/pkg/api/proto/v1"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/customerrors"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/model"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -18,6 +19,7 @@ const (
 	ThirdSKUID  = 1003
 	FourthSKUID = 1004
 	PaySKUID    = 1005
+	CancelSKUID = 2956315
 )
 
 type GRPCSuite struct {
@@ -163,11 +165,19 @@ func (s *GRPCSuite) TestOrderPay() {
 			},
 		},
 		{
-			name: "OrderPay with invalid SKU",
+			name: "OrderPay with invalid order ID",
 			req: func() *loms.OrderPayRequest {
 				return &loms.OrderPayRequest{OrderId: 0}
 			},
 			expectedErr: status.Errorf(codes.FailedPrecondition, "invalid order ID"),
+			expectResp:  nil,
+		},
+		{
+			name: "OrderPay with not status awaiting payment",
+			req: func() *loms.OrderPayRequest {
+				return &loms.OrderPayRequest{OrderId: OrderId}
+			},
+			expectedErr: status.Errorf(codes.FailedPrecondition, customerrors.ErrOrderStatusAwaitingPayment.Error()),
 			expectResp:  nil,
 		},
 	}
@@ -189,43 +199,67 @@ func (s *GRPCSuite) TestOrderPay() {
 }
 
 func (s *GRPCSuite) TestOrderCancel() {
+	var OrderId int64
+	items := []*loms.Item{
+		{
+			Sku:   CancelSKUID,
+			Count: 10,
+		},
+	}
 	tests := []struct {
 		name        string
-		req         *loms.OrderCancelRequest
+		req         func() *loms.OrderCancelRequest
 		expectedErr error
+		expectResp  *loms.OrderInfoResponse
 	}{
 		{
-			name:        "OrderCancel",
+			name: "Order Cancel",
+			req: func() *loms.OrderCancelRequest {
+				orderID, err := s.client.OrderCreate(context.Background(), &loms.OrderCreateRequest{
+					UserId: UserID,
+					Info: &loms.OrderInfo{
+						Items: items,
+					},
+				})
+				OrderId = orderID.OrderId
+				s.Require().NoError(err)
+				return &loms.OrderCancelRequest{OrderId: orderID.OrderId}
+			},
 			expectedErr: nil,
+			expectResp: &loms.OrderInfoResponse{
+				Status: model.OrderStatusCancelled.String(),
+				User:   UserID,
+				Items:  items,
+			},
 		},
 		{
-			name:        "OrderCancel with invalid SKU",
+			name: "Order Cancel with invalid order ID",
+			req: func() *loms.OrderCancelRequest {
+				return &loms.OrderCancelRequest{OrderId: 0}
+			},
 			expectedErr: status.Errorf(codes.FailedPrecondition, "invalid order ID"),
+		},
+		{
+			name: "Order Cancel with not status awaiting payment",
+			req: func() *loms.OrderCancelRequest {
+				return &loms.OrderCancelRequest{OrderId: OrderId}
+			},
+			expectedErr: status.Errorf(codes.FailedPrecondition, customerrors.ErrOrderStatusAwaitingPayment.Error()),
 		},
 	}
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			createResp, err := s.client.OrderCreate(context.Background(), &loms.OrderCreateRequest{
-				UserId: UserID,
-				Info: &loms.OrderInfo{
-					Items: []*loms.Item{
-						{
-							Sku:   FirstSKUID,
-							Count: 10,
-						},
-					},
-				},
-			})
-			s.Require().NoError(err)
-			if tt.expectedErr == nil {
-				tt.req = &loms.OrderCancelRequest{OrderId: createResp.OrderId}
-			} else {
-				tt.req = &loms.OrderCancelRequest{OrderId: 0}
-			}
-
-			_, err = s.client.OrderCancel(context.Background(), tt.req)
+			cancelReq := tt.req()
+			_, err := s.client.OrderCancel(context.Background(), cancelReq)
 			s.ErrorIs(err, tt.expectedErr)
+			if tt.expectedErr == nil {
+				orderResp, err := s.client.OrderInfo(context.Background(), &loms.OrderInfoRequest{
+					OrderId: OrderId,
+				})
+				s.Require().NoError(err)
+				s.True(proto.Equal(tt.expectResp, orderResp))
+			}
 		})
 	}
 }
@@ -241,7 +275,7 @@ func (s *GRPCSuite) TestOrderInfo() {
 			expectedErr: nil,
 		},
 		{
-			name:        "OrderInfo with invalid SKU",
+			name:        "OrderInfo with invalid order ID",
 			expectedErr: status.Errorf(codes.FailedPrecondition, "invalid order ID"),
 		},
 	}

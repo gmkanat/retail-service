@@ -1,10 +1,11 @@
-package service_test
+package order_test
 
 import (
 	"context"
 	"github.com/gojuno/minimock/v3"
 	"github.com/stretchr/testify/require"
-	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/mocks"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/mocks/order"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/mocks/stock"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/model"
 	service "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/order"
 	"testing"
@@ -13,8 +14,8 @@ import (
 func TestService_OrderInfo(t *testing.T) {
 	mc := minimock.NewController(t)
 
-	orderRepoMock := mocks.NewOrderRepositoryMock(mc)
-	stockRepoMock := mocks.NewStockRepositoryMock(mc)
+	orderRepoMock := order.NewRepositoryMock(mc)
+	stockRepoMock := stock.NewRepositoryMock(mc)
 
 	orderService := service.NewOrderService(orderRepoMock, stockRepoMock)
 

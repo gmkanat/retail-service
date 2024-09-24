@@ -1,4 +1,4 @@
-package service
+package order
 
 import (
 	"context"
@@ -17,7 +17,7 @@ func (s *Service) OrderPay(ctx context.Context, orderID int64) error {
 	}
 
 	if order.Status != model.OrderStatusAwaitingPayment {
-		return nil
+		return customerrors.ErrOrderStatusAwaitingPayment
 	}
 
 	for _, item := range order.Items {

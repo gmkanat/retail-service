@@ -5,6 +5,21 @@
     "reserved": 10
   },
   {
+    "sku": 1076963,
+    "total_count": 160,
+    "reserved": 12
+  },
+  {
+    "sku": 1625903,
+    "total_count": 170,
+    "reserved": 14
+  },
+  {
+    "sku": 2956315,
+    "total_count": 180,
+    "reserved": 16
+  },
+  {
     "sku": 1002,
     "total_count": 200,
     "reserved": 20
