@@ -44,10 +44,14 @@ func (s *Server) AddItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.cartService.AddItem(r.Context(), userId, skuId, req.Count); err != nil {
-		if errors.Is(err, customerrors.SkuNotFound) {
+		switch {
+		case errors.Is(err, customerrors.SkuNotFound):
 			log.Printf("AddItem, SKU not found: %v", err)
 			http.Error(w, "SKU not found", http.StatusPreconditionFailed)
-		} else {
+		case errors.Is(err, customerrors.NotEnoughStock):
+			log.Printf("AddItem, not enough stock: %v", err)
+			http.Error(w, "Not enough stock", http.StatusPreconditionFailed)
+		default:
 			log.Printf("AddItem, internal server error: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}

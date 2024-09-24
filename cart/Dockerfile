@@ -1,18 +1,23 @@
 FROM golang:1.22.5-alpine as builder
 LABEL authors="blackm1nd"
 
-WORKDIR /build
+WORKDIR /cart
 
-COPY go.mod go.mod
-COPY go.sum go.sum
+RUN go env -w GOCACHE=/go-cache
+RUN go env -w GOMODCACHE=/gomod-cache
 
-RUN go mod download
+COPY cart/go.mod cart/go.sum ./
+RUN --mount=type=cache,target=/gomod-cache go mod download
 
+COPY api api
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /server ./cmd/server/server.go
 
-FROM scratch
-COPY --from=builder server /bin/server
+RUN  --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache CGO_ENABLED=0 GOOS=linux go build -o /server cart/cmd/server/server.go
+
+FROM alpine:latest
+RUN apk add --no-cache bash
+
+COPY --from=builder /server /bin/server
 EXPOSE 8002
 ENTRYPOINT ["/bin/server"]

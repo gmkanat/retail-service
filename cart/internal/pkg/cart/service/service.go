@@ -17,14 +17,21 @@ type ProductService interface {
 	GetProduct(ctx context.Context, skuID int64) (*service.Product, error)
 }
 
+type LomsClient interface {
+	OrderCreate(ctx context.Context, userID int64, items []model.CartItem) (orderID int64, err error)
+	GetStock(ctx context.Context, skuID int64) (int64, error)
+}
+
 type CartService struct {
 	repository     CartRepository
 	productService ProductService
+	lomsClient     LomsClient
 }
 
-func NewService(repository CartRepository, productService ProductService) *CartService {
+func NewService(repository CartRepository, productService ProductService, lomsClient LomsClient) *CartService {
 	return &CartService{
 		repository:     repository,
 		productService: productService,
+		lomsClient:     lomsClient,
 	}
 }

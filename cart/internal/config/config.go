@@ -9,8 +9,9 @@ import (
 
 type Config struct {
 	BaseURL        string
+	LomsAddr       string
 	Token          string
-	Port           string
+	PortAddr       string
 	MaxRetries     int
 	InitialBackoff time.Duration
 }
@@ -31,6 +32,11 @@ func Load() *Config {
 		log.Fatalf("PORT not set")
 	}
 
+	lomsAddr := os.Getenv("LOMS_ADDR")
+	if lomsAddr == "" {
+		log.Fatalf("LOMS_ADDR not set")
+	}
+
 	maxRetriesStr := os.Getenv("MAX_RETRIES")
 	maxRetries, err := strconv.Atoi(maxRetriesStr)
 	if err != nil {
@@ -46,8 +52,9 @@ func Load() *Config {
 	return &Config{
 		BaseURL:        baseURL,
 		Token:          token,
-		Port:           port,
+		PortAddr:       port,
 		MaxRetries:     maxRetries,
 		InitialBackoff: initialBackoff,
+		LomsAddr:       lomsAddr,
 	}
 }
