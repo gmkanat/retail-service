@@ -7,5 +7,5 @@ import (
 )
 
 func TestGRPCSuite(t *testing.T) {
-	suite.Run(t, new(grpcSuite.GRPCSuite))
+	suite.Run(t, new(grpcSuite.PostgresSuit))
 }
