@@ -1,0 +1,18 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema: "./migrations"
+    queries: "./internal/repository_sqlc/order/queries.sql"
+    gen:
+      go:
+        package: "pgordersqry"
+        sql_package: "pgx/v5"
+        out: "./internal/repository_sqlc/order/queries"
+  - engine: "postgresql"
+    schema: "./migrations"
+    queries: "./internal/repository_sqlc/stock/queries.sql"
+    gen:
+      go:
+        package: "pgstocksqry"
+        sql_package: "pgx/v5"
+        out: "./internal/repository_sqlc/stock/queries"

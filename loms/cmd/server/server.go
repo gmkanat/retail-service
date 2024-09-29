@@ -6,7 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	httpSwagger "github.com/swaggo/http-swagger"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/pgcluster"
-	orderRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_raw/order"
+	orderRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_sqlc/order"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -16,7 +16,7 @@ import (
 
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/app"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/config"
-	stockRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_raw/stock"
+	stockRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_sqlc/stock"
 	orderService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/order"
 	stockService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/stock"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/middleware"
