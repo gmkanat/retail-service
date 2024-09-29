@@ -3,9 +3,9 @@ package grpc_suite
 import (
 	"context"
 	"github.com/stretchr/testify/suite"
-	loms "gitlab.ozon.dev/kanat_9999/homework/cart/pkg/api/proto/v1"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/customerrors"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/model"
+	loms "gitlab.ozon.dev/kanat_9999/homework/loms/pkg/api/proto/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

@@ -9,6 +9,7 @@ type AppConfig struct {
 	HTTPPort    string `json:"http_port"`
 	StockFile   string `json:"stock_file"`
 	SwaggerFile string `json:"swagger_file"`
+	DataBaseURL string `json:"database_url"`
 }
 
 func Load() *AppConfig {
@@ -31,10 +32,16 @@ func Load() *AppConfig {
 		swaggerFile = "../api/openapiv2/loms.swagger.json"
 	}
 
+	dataBaseURL := os.Getenv("LOMS_DATABASE_URL")
+	if dataBaseURL == "" {
+		dataBaseURL = "postgres://user:password@localhost:5432/route256"
+	}
+
 	return &AppConfig{
 		GRPCPort:    grpcPort,
 		HTTPPort:    httpPort,
 		StockFile:   stockFile,
 		SwaggerFile: swaggerFile,
+		DataBaseURL: dataBaseURL,
 	}
 }
