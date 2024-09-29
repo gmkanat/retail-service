@@ -110,3 +110,9 @@ endef
 .PHONY: .serve-swagger
 .serve-swagger:
 	bin/swagger serve api/openapiv2/loms.swagger.json
+
+.PHONY: .install-goose
+.install-goose:
+	$(info Installing binary dependencies...)
+	GOBIN=$(LOCAL_BIN) go install github.com/pressly/goose/v3/cmd/goose@latest
+

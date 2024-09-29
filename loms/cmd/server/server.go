@@ -2,20 +2,20 @@ package main
 
 import (
 	"context"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/jackc/pgx/v5"
+	httpSwagger "github.com/swaggo/http-swagger"
+	orderRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_raw/order"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/reflection"
 	"log"
 	"net"
 	"net/http"
 
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	httpSwagger "github.com/swaggo/http-swagger"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/reflection"
-
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/app"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/config"
-	orderRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository/order"
-	stockRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository/stock"
+	stockRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_raw/stock"
 	orderService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/order"
 	stockService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/stock"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/middleware"
@@ -32,13 +32,19 @@ func main() {
 }
 
 func setupServices(cfg *config.AppConfig) *app.Service {
-	initialStocks, err := config.LoadStocks(cfg.StockFile)
+	//initialStocks, err := config.LoadStocks(cfg.StockFile)
+	//if err != nil {
+	//	log.Fatalf("failed to load stock data: %v", err)
+	//}
+
+	conn, err := pgx.Connect(context.Background(), cfg.DataBaseURL)
 	if err != nil {
-		log.Fatalf("failed to load stock data: %v", err)
+		log.Fatalf("Unable to connect to database: %v\n", err)
 	}
 
-	orderRepo := orderRepository.NewOrderRepository()
-	stockRepo := stockRepository.NewStockRepository(initialStocks)
+	orderRepo := orderRepository.NewRepository(conn)
+	stockRepo := stockRepository.NewRepository(conn)
+	
 	orderSvc := orderService.NewOrderService(orderRepo, stockRepo)
 	stockSvc := stockService.NewStockService(stockRepo)
 
