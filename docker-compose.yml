@@ -34,13 +34,13 @@ services:
       - LOMS_HTTP_PORT=0.0.0.0:8088
       - LOMS_STOCK_FILE=/loms/stock-data.json
       - LOMS_SWAGGER_FILE=/loms/loms.swagger.json
-      - LOMS_DATABASE_URL=postgresql://loms_user:loms_password@pg_master:5432/loms_db?sslmode=disable
+      - LOMS_MASTER_DB_URL=postgresql://loms_user:loms_password@pg_master:5432/loms_db?sslmode=disable
+      - LOMS_SLAVE_DB_URL=postgresql://loms_user:loms_password@pg_slave:5432/loms_db?sslmode=disable
     networks:
       - backend
     depends_on:
       - pg_master
       - pg_slave
-      - migration
   
   pg_master:
     container_name: pg_master

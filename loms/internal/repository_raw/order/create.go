@@ -8,8 +8,13 @@ import (
 )
 
 func (r *Repository) Create(ctx context.Context, userID int64, items []model.Item) (int64, error) {
+	writer, err := r.cluster.GetWriter(ctx)
+	if err != nil {
+		log.Printf("Failed to get writer: %v", err)
+		return 0, err
+	}
 
-	tx, err := r.db.Begin(ctx)
+	tx, err := writer.Begin(ctx)
 	if err != nil {
 		log.Printf("failed to begin transaction: %v", err)
 		return 0, err

@@ -7,11 +7,16 @@ import (
 )
 
 func (r *Repository) GetByID(ctx context.Context, orderID int64) (*model.Order, error) {
+	reader, err := r.cluster.GetReader(ctx)
+	if err != nil {
+		log.Printf("Failed to get reader: %v", err)
+		return nil, err
+	}
+
 	var order model.Order
 	var status string
 
-	// Fetch order data
-	err := r.db.QueryRow(ctx,
+	err = reader.QueryRow(ctx,
 		`SELECT id, user_id, status, created_at, updated_at FROM orders.orders WHERE id = $1`,
 		orderID,
 	).Scan(&order.OrderID, &order.UserID, &status, &order.CreatedAt, &order.UpdatedAt)
@@ -20,8 +25,7 @@ func (r *Repository) GetByID(ctx context.Context, orderID int64) (*model.Order, 
 		return nil, err
 	}
 
-	// Fetch associated items
-	rows, err := r.db.Query(ctx,
+	rows, err := reader.Query(ctx,
 		`SELECT sku_id, count FROM orders.order_items WHERE order_id = $1`,
 		orderID,
 	)

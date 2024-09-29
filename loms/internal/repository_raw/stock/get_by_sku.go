@@ -9,9 +9,15 @@ import (
 )
 
 func (r *Repository) GetBySKU(ctx context.Context, sku uint32) (uint64, error) {
+	reader, err := r.cluster.GetReader(ctx)
+	if err != nil {
+		log.Printf("Failed to get reader: %v", err)
+		return 0, err
+	}
+
 	var available, reserved uint64
 
-	err := r.db.QueryRow(ctx, `
+	err = reader.QueryRow(ctx, `
 		SELECT available, reserved
 		FROM stocks.stocks
 		WHERE id = $1`, sku).Scan(&available, &reserved)

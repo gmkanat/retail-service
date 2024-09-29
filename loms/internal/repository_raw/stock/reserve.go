@@ -9,7 +9,13 @@ import (
 )
 
 func (r *Repository) Reserve(ctx context.Context, sku uint32, count uint16) error {
-	tx, err := r.db.Begin(ctx)
+	writer, err := r.cluster.GetWriter(ctx)
+	if err != nil {
+		log.Printf("Failed to get writer: %v", err)
+		return err
+	}
+
+	tx, err := writer.Begin(ctx)
 	if err != nil {
 		log.Printf("Failed to start transaction: %v", err)
 		return err

@@ -9,7 +9,13 @@ import (
 )
 
 func (r *Repository) Release(ctx context.Context, sku uint32, count uint16) error {
-	tx, err := r.db.Begin(ctx)
+	writer, err := r.cluster.GetWriter(ctx)
+	if err != nil {
+		log.Printf("Failed to get writer: %v", err)
+		return err
+	}
+
+	tx, err := writer.Begin(ctx)
 	if err != nil {
 		log.Printf("Failed to start transaction: %v", err)
 		return err
@@ -42,6 +48,11 @@ func (r *Repository) Release(ctx context.Context, sku uint32, count uint16) erro
 		WHERE id = $2`, count, sku)
 	if err != nil {
 		log.Printf("Failed to update stock: %v", err)
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		log.Printf("Failed to commit transaction: %v", err)
 		return err
 	}
 

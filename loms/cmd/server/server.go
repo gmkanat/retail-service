@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	httpSwagger "github.com/swaggo/http-swagger"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/pgcluster"
 	orderRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_raw/order"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -25,20 +26,40 @@ import (
 func main() {
 	cfg := config.Load()
 
-	server := setupServices(cfg)
+	cluster, err := setupDatabaseCluster(cfg)
+	if err != nil {
+		log.Fatalf("Failed to setup database cluster: %v", err)
+	}
+	defer cluster.Close()
+
+	server := setupServices(cluster)
 
 	go startGRPCServer(cfg, server)
 	startHTTPServer(cfg, server)
 }
+func setupDatabaseCluster(cfg *config.AppConfig) (*pgcluster.Cluster, error) {
+	ctx := context.Background()
 
-func setupServices(cfg *config.AppConfig) *app.Service {
-	conn, err := pgx.Connect(context.Background(), cfg.DataBaseURL)
+	masterPool, err := pgxpool.New(ctx, cfg.MasterDBURL)
 	if err != nil {
-		log.Fatalf("Unable to connect to database: %v\n", err)
+		return nil, err
 	}
 
-	orderRepo := orderRepository.NewRepository(conn)
-	stockRepo := stockRepository.NewRepository(conn)
+	slavePool, err := pgxpool.New(ctx, cfg.ReplicaDBURL)
+	if err != nil {
+		return nil, err
+	}
+
+	cluster := pgcluster.New().
+		SetWriter(masterPool).
+		AddReader(slavePool)
+
+	return cluster, nil
+}
+
+func setupServices(cluster *pgcluster.Cluster) *app.Service {
+	orderRepo := orderRepository.NewRepository(cluster)
+	stockRepo := stockRepository.NewRepository(cluster)
 
 	orderSvc := orderService.NewOrderService(orderRepo, stockRepo)
 	stockSvc := stockService.NewStockService(stockRepo)

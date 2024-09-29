@@ -1,13 +1,13 @@
 package order
 
-import (
-	"github.com/jackc/pgx/v5"
-)
+import "gitlab.ozon.dev/kanat_9999/homework/loms/internal/pgcluster"
 
 type Repository struct {
-	db *pgx.Conn
+	cluster *pgcluster.Cluster
 }
 
-func NewRepository(db *pgx.Conn) *Repository {
-	return &Repository{db: db}
+func NewRepository(cluster *pgcluster.Cluster) *Repository {
+	return &Repository{
+		cluster: cluster,
+	}
 }
