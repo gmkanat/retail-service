@@ -14,8 +14,6 @@ func (r *Repository) Release(ctx context.Context, sku uint32, count uint16) erro
 		return err
 	}
 
-	q := pgstocksqry.New(writer)
-
 	tx, err := writer.Begin(ctx)
 	if err != nil {
 		log.Printf("Failed to start transaction: %v", err)
@@ -23,6 +21,8 @@ func (r *Repository) Release(ctx context.Context, sku uint32, count uint16) erro
 	}
 
 	defer tx.Rollback(ctx)
+
+	q := pgstocksqry.New(writer).WithTx(tx)
 
 	reserved, err := q.GetReservedStock(ctx, int64(sku))
 
@@ -37,12 +37,18 @@ func (r *Repository) Release(ctx context.Context, sku uint32, count uint16) erro
 	}
 
 	err = q.ReleaseStock(ctx, pgstocksqry.ReleaseStockParams{
-		ID:       int64(sku),
-		Reserved: int64(count),
+		ID:        int64(sku),
+		Available: int64(count),
 	})
 	if err != nil {
 		log.Printf("Failed to release stock: %v", err)
 		return err
 	}
+
+	if err = tx.Commit(ctx); err != nil {
+		log.Printf("Failed to commit transaction: %v", err)
+		return err
+	}
+
 	return nil
 }

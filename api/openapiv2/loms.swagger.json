@@ -233,6 +233,14 @@
             "type": "object",
             "$ref": "#/definitions/Item"
           }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },

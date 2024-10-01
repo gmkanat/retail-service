@@ -12,13 +12,12 @@ type Cluster struct {
 	write         *pgxpool.Pool
 	read          []*pgxpool.Pool
 	roundRobinIdx int
-	mu            *sync.Mutex
+	mu            sync.Mutex
 }
 
 func New() *Cluster {
 	return &Cluster{
 		roundRobinIdx: 0,
-		mu:            &sync.Mutex{},
 	}
 }
 

@@ -7,14 +7,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/config"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/model"
 	loms "gitlab.ozon.dev/kanat_9999/homework/loms/pkg/api/proto/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"testing"
 	"time"
 )
 
-type PostgresSuit struct {
+type PostgresSuite struct {
 	suite.Suite
 	client   loms.LomsClient
 	conn     *grpc.ClientConn
@@ -24,11 +27,11 @@ type PostgresSuit struct {
 	sleepDur time.Duration
 }
 
-func (s *PostgresSuit) SetupSuite() {
+func (s *PostgresSuite) SetupSuite() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
-	s.sleepDur = 300 * time.Millisecond
+	s.sleepDur = 100 * time.Millisecond
 	cfg := config.Load()
 
 	conn, err := grpc.DialContext(ctx, cfg.GRPCPort, grpc.WithInsecure())
@@ -48,34 +51,31 @@ func (s *PostgresSuit) SetupSuite() {
 	s.pool = pool
 }
 
-func (s *PostgresSuit) TearDownSuite() {
+func (s *PostgresSuite) TearDownSuite() {
 	s.conn.Close()
 	s.cancel()
 	s.pool.Close()
 }
 
-func (s *PostgresSuit) SetupMigration() {
-	addStockDataQuery := `
+// SetupMigration
+// 12345678 -> total 200, 50 reserved, 150 available,
+// 23456789 -> total 100, 70 reserved, 30 available
+// 34567890 -> total 50, 20 reserved, 30 available
+// we have 2 orders,
+func (s *PostgresSuite) SetupMigration() {
+	ctx := context.Background()
+
+	userID := 999
+	createStockQuery := `
 		INSERT INTO stocks.stocks (id, available, reserved) VALUES
-		($1, $2, $3)
-		ON CONFLICT DO NOTHING
+		(12345678, 150, 50),
+		(23456789, 30, 70),
+		(34567890, 30, 20)
+		ON CONFLICT (id) DO UPDATE SET available = EXCLUDED.available, reserved = EXCLUDED.reserved
 	`
-
-	//	just generate from 100 to 110
-	// 	100 - 10 reserved, 90 available
-	// 	101 - 11 reserved, 89 available
-	// 	102 - 12 reserved, 88 available
-	// 	103 - 13 reserved, 87 available
-	// 	104 - 14 reserved, 86 available
-	// 	105 - 15 reserved, 85 available
-	cnt := 10
-	for i := 100; i < 106; i++ {
-		_, err := s.pool.Exec(context.Background(), addStockDataQuery, i, 100-cnt, cnt)
-		if err != nil {
-			s.T().Fatal(err)
-		}
-		cnt += 1
-
+	_, err := s.pool.Exec(ctx, createStockQuery)
+	if err != nil {
+		s.T().Fatal(err)
 	}
 
 	createOrderQuery := `
@@ -89,30 +89,32 @@ func (s *PostgresSuit) SetupMigration() {
 	`
 
 	var firstOrderID, secondOrderID int64
-	ctx := context.Background()
-	err := s.pool.QueryRow(ctx, createOrderQuery, 1, "AwaitingPayment").Scan(&firstOrderID)
+
+	// first order
+	err = s.pool.QueryRow(ctx, createOrderQuery, userID, model.OrderStatusAwaitingPayment.String()).Scan(&firstOrderID)
 	if err != nil {
 		s.T().Fatal(err)
 	}
 
-	err = s.pool.QueryRow(ctx, createOrderQuery, 1, "AwaitingPayment").Scan(&secondOrderID)
-	if err != nil {
-		s.T().Fatal(err)
-	}
-
-	_, err = s.pool.Exec(ctx, createItemQuery, firstOrderID, 100, 10)
-
-	if err != nil {
-		s.T().Fatal(err)
-	}
-
-	_, err = s.pool.Exec(ctx, createItemQuery, firstOrderID, 100, 20)
+	_, err = s.pool.Exec(ctx, createItemQuery, firstOrderID, 12345678, 10)
 
 	if err != nil {
 		s.T().Fatal(err)
 	}
 
-	_, err = s.pool.Exec(ctx, createItemQuery, secondOrderID, 101, 30)
+	_, err = s.pool.Exec(ctx, createItemQuery, firstOrderID, 23456789, 20)
+
+	if err != nil {
+		s.T().Fatal(err)
+	}
+
+	// second order
+	err = s.pool.QueryRow(ctx, createOrderQuery, userID, model.OrderStatusAwaitingPayment.String()).Scan(&secondOrderID)
+	if err != nil {
+		s.T().Fatal(err)
+	}
+
+	_, err = s.pool.Exec(ctx, createItemQuery, secondOrderID, 34567890, 5)
 	if err != nil {
 		s.T().Fatal(err)
 	}
@@ -120,38 +122,40 @@ func (s *PostgresSuit) SetupMigration() {
 	s.orderIDs = append(s.orderIDs, firstOrderID, secondOrderID)
 }
 
-func (s *PostgresSuit) TearDownMigration() {
-	deleteOrderQuery := `
-		DELETE FROM orders.orders
-		WHERE id = $1
+func (s *PostgresSuite) TearDownMigration() {
+	ctx := context.Background()
+
+	deleteOrderItemsQuery := `
+		DELETE FROM orders.order_items WHERE order_id = $1
 	`
-	deleteItemQuery := `
-		DELETE FROM orders.order_items
-		WHERE order_id = $1
+	deleteOrdersQuery := `
+		DELETE FROM orders.orders WHERE id = $1
+	`
+	deleteStocksQuery := `
+		DELETE FROM stocks.stocks WHERE id IN (12345678, 23456789, 34567890)
 	`
 
-	for _, id := range s.orderIDs {
-		_, err := s.pool.Exec(context.Background(), deleteItemQuery, id)
+	for _, orderID := range s.orderIDs {
+		_, err := s.pool.Exec(ctx, deleteOrderItemsQuery, orderID)
 		if err != nil {
 			s.T().Fatal(err)
 		}
-		_, err = s.pool.Exec(context.Background(), deleteOrderQuery, id)
+
+		_, err = s.pool.Exec(ctx, deleteOrdersQuery, orderID)
 		if err != nil {
 			s.T().Fatal(err)
 		}
 	}
 
-	deleteStockQuery := `
-		DELETE FROM stocks.stocks
-		WHERE id >= 100 AND id < 106
-	`
-	_, err := s.pool.Exec(context.Background(), deleteStockQuery)
+	_, err := s.pool.Exec(ctx, deleteStocksQuery)
 	if err != nil {
 		s.T().Fatal(err)
 	}
+
+	s.orderIDs = nil
 }
 
-func (s *PostgresSuit) TestOrderCreate() {
+func (s *PostgresSuite) TestOrderCreate() {
 	s.SetupMigration()
 	defer s.TearDownMigration()
 
@@ -164,11 +168,11 @@ func (s *PostgresSuit) TestOrderCreate() {
 		{
 			name: "OrderCreate",
 			req: &loms.OrderCreateRequest{
-				UserId: 1,
+				UserId: 999,
 				Info: &loms.OrderInfo{
 					Items: []*loms.Item{
 						{
-							Sku:   100,
+							Sku:   12345678,
 							Count: 10,
 						},
 					},
@@ -176,10 +180,10 @@ func (s *PostgresSuit) TestOrderCreate() {
 			},
 			expectResponse: &loms.OrderInfoResponse{
 				Status: "AwaitingPayment",
-				User:   1,
+				User:   999,
 				Items: []*loms.Item{
 					{
-						Sku:   100,
+						Sku:   12345678,
 						Count: 10,
 					},
 				},
@@ -226,27 +230,22 @@ func (s *PostgresSuit) TestOrderCreate() {
 				require.Equal(t, tt.expectError.Error(), err.Error())
 				return
 			}
-
+			s.orderIDs = append(s.orderIDs, resp.OrderId)
 			time.Sleep(s.sleepDur) // in order not to read uncommitted replica data
 
 			require.NoError(t, err)
 			infoResp, err := s.client.OrderInfo(context.Background(), &loms.OrderInfoRequest{OrderId: resp.OrderId})
 			require.NoError(t, err)
-			s.True(proto.Equal(tt.expectResponse, infoResp))
+			require.Equal(t, tt.expectResponse.Status, infoResp.Status)
+			require.Equal(t, tt.expectResponse.User, infoResp.User)
+			require.Equal(t, tt.expectResponse.Items, infoResp.Items)
 		})
 	}
 }
 
-func (s *PostgresSuit) TestOrderPay() {
+func (s *PostgresSuite) TestOrderPay() {
 	s.SetupMigration()
 	defer s.TearDownMigration()
-
-	items := []*loms.Item{
-		{
-			Sku:   100,
-			Count: 10,
-		},
-	}
 
 	tests := []struct {
 		name        string
@@ -257,21 +256,20 @@ func (s *PostgresSuit) TestOrderPay() {
 		{
 			name: "OrderPay",
 			req: func() *loms.OrderPayRequest {
-				orderID, err := s.client.OrderCreate(context.Background(), &loms.OrderCreateRequest{
-					UserId: 1,
-					Info: &loms.OrderInfo{
-						Items: items,
-					},
-				})
-				require.NoError(s.T(), err)
-				fmt.Println(orderID)
-				return &loms.OrderPayRequest{OrderId: orderID.OrderId}
+				return &loms.OrderPayRequest{
+					OrderId: s.orderIDs[1],
+				}
 			},
 			expectedErr: nil,
 			expectResp: &loms.OrderInfoResponse{
-				Status: "Payed",
-				User:   1,
-				Items:  items,
+				Status: "Paid",
+				User:   999,
+				Items: []*loms.Item{
+					{
+						Sku:   34567890,
+						Count: 5,
+					},
+				},
 			},
 		},
 		{
@@ -279,28 +277,176 @@ func (s *PostgresSuit) TestOrderPay() {
 			req: func() *loms.OrderPayRequest {
 				return &loms.OrderPayRequest{OrderId: 0}
 			},
-			expectedErr: fmt.Errorf("rpc error: code = FailedPrecondition desc = invalid order ID"),
+			expectedErr: status.Errorf(codes.FailedPrecondition, "invalid order ID"),
 			expectResp:  nil,
 		},
 	}
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			time.Sleep(s.sleepDur) // in order not to read uncommitted replica data
 			payReq := tt.req()
 			_, err := s.client.OrderPay(context.Background(), payReq)
+			s.ErrorIs(err, tt.expectedErr)
+
+			time.Sleep(s.sleepDur) // in order not to read uncommitted replica data
+
+			if err == nil {
+				infoResp, err := s.client.OrderInfo(context.Background(), &loms.OrderInfoRequest{OrderId: payReq.OrderId})
+				require.NoError(s.T(), err)
+				require.Equal(s.T(), tt.expectResp.Status, infoResp.Status)
+				require.Equal(s.T(), tt.expectResp.Items, infoResp.Items)
+			}
+		})
+	}
+}
+
+func (s *PostgresSuite) TestOrderCancel() {
+	s.SetupMigration()
+	defer s.TearDownMigration()
+
+	tests := []struct {
+		name        string
+		req         func() *loms.OrderCancelRequest
+		expectedErr error
+	}{
+		{
+			name: "OrderCancel",
+			req: func() *loms.OrderCancelRequest {
+				return &loms.OrderCancelRequest{
+					OrderId: s.orderIDs[0],
+				}
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "OrderCancel with invalid order ID",
+			req: func() *loms.OrderCancelRequest {
+				return &loms.OrderCancelRequest{OrderId: 0}
+			},
+			expectedErr: status.Errorf(codes.FailedPrecondition, "invalid order ID"),
+		},
+		{
+			name: "OrderCancel with not status awaiting payment",
+			req: func() *loms.OrderCancelRequest {
+				return &loms.OrderCancelRequest{OrderId: s.orderIDs[0]}
+			},
+			expectedErr: status.Errorf(codes.FailedPrecondition, "order status is not awaiting payment"),
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			time.Sleep(s.sleepDur) // in order not to read uncommitted replica data
+			cancelReq := tt.req()
+			_, err := s.client.OrderCancel(context.Background(), cancelReq)
+			s.ErrorIs(err, tt.expectedErr)
+
+			time.Sleep(s.sleepDur) // in order not to read uncommitted replica data
+
+			if err == nil {
+				infoResp, err := s.client.OrderInfo(context.Background(), &loms.OrderInfoRequest{OrderId: cancelReq.OrderId})
+				require.NoError(s.T(), err)
+				require.Equal(s.T(), "Cancelled", infoResp.Status)
+			}
+		})
+	}
+}
+
+func (s *PostgresSuite) TestOrderInfo() {
+	s.SetupMigration()
+	defer s.TearDownMigration()
+
+	tests := []struct {
+		name        string
+		req         *loms.OrderInfoRequest
+		expectedErr error
+		expectResp  *loms.OrderInfoResponse
+	}{
+		{
+			name: "OrderInfo",
+			req: &loms.OrderInfoRequest{
+				OrderId: s.orderIDs[0],
+			},
+			expectResp: &loms.OrderInfoResponse{
+				Status: "AwaitingPayment",
+				User:   999,
+				Items: []*loms.Item{
+					{
+						Sku:   12345678,
+						Count: 10,
+					},
+					{
+						Sku:   23456789,
+						Count: 20,
+					},
+				},
+			},
+		},
+		{
+			name: "OrderInfo with invalid order ID",
+			req: &loms.OrderInfoRequest{
+				OrderId: 0,
+			},
+			expectedErr: status.Errorf(codes.FailedPrecondition, "invalid order ID"),
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			time.Sleep(s.sleepDur) // in order not to read uncommitted replica data
+			infoResp, err := s.client.OrderInfo(context.Background(), tt.req)
+
 			if tt.expectedErr != nil {
 				require.Error(s.T(), err)
 				require.Equal(s.T(), tt.expectedErr.Error(), err.Error())
 				return
 			}
-			require.NoError(s.T(), err)
 
-			time.Sleep(s.sleepDur) // Sleep to avoid reading uncommitted data from replica
-			orderResp, err := s.client.OrderInfo(context.Background(), &loms.OrderInfoRequest{OrderId: payReq.OrderId})
-			fmt.Println(orderResp)
-			fmt.Println(tt.expectResp)
 			require.NoError(s.T(), err)
-			s.True(proto.Equal(tt.expectResp, orderResp))
+			require.Equal(s.T(), tt.expectResp.Status, infoResp.Status)
+			require.Equal(s.T(), tt.expectResp.User, infoResp.User)
+			require.Equal(s.T(), tt.expectResp.Items, infoResp.Items)
+		})
+	}
+}
+
+func (s *PostgresSuite) TestStocksInfo() {
+	s.SetupMigration()
+	defer s.TearDownMigration()
+
+	tests := []struct {
+		name        string
+		req         *loms.StocksInfoRequest
+		expectedErr error
+		expectResp  *loms.StocksInfoResponse
+	}{
+		{
+			name: "StocksInfo",
+			req: &loms.StocksInfoRequest{
+				Sku: 12345678,
+			},
+			expectResp: &loms.StocksInfoResponse{
+				AvailableCount: 150,
+			},
+		},
+		{
+			name: "StocksInfo with invalid SKU",
+			req: &loms.StocksInfoRequest{
+				Sku: 0,
+			},
+			expectedErr: status.Errorf(codes.Unknown, "stock not found"),
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			time.Sleep(s.sleepDur) // in order not to read uncommitted replica data
+			resp, err := s.client.StocksInfo(context.Background(), tt.req)
+			s.ErrorIs(err, tt.expectedErr)
+			if tt.expectedErr == nil {
+				s.True(proto.Equal(tt.expectResp, resp))
+			}
 		})
 	}
 }

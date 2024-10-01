@@ -1,7 +1,6 @@
 -- +goose Up
 -- +goose StatementBegin
 
--- Insert the updated SKU values into the stocks table
 INSERT INTO stocks.stocks (id, available, reserved)
 VALUES
   (773297411, 150, 10),
@@ -12,13 +11,11 @@ VALUES
   (1003, 250, 30),
   (1004, 300, 40),
   (1005, 350, 50);
-
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
 
--- Truncate the stocks table to remove all data
 DELETE FROM stocks.stocks
 WHERE id IN (773297411, 1076963, 1625903, 2956315, 1002, 1003, 1004, 1005);
 

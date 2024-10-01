@@ -22,11 +22,11 @@ func (r *Repository) ReserveRemove(ctx context.Context, sku uint32, count uint16
 	}
 	defer tx.Rollback(ctx)
 
-	var totalCount, reserved uint64
+	var reserved uint64
 	err = tx.QueryRow(ctx, `
-		SELECT available, reserved
+		SELECT reserved
 		FROM stocks.stocks
-		WHERE id = $1`, sku).Scan(&totalCount, &reserved)
+		WHERE id = $1`, sku).Scan(&reserved)
 	if errors.Is(err, pgx.ErrNoRows) {
 		log.Printf("Stock %d not found", sku)
 		return customerrors.ErrStockNotFound
@@ -42,7 +42,7 @@ func (r *Repository) ReserveRemove(ctx context.Context, sku uint32, count uint16
 
 	_, err = tx.Exec(ctx, `
 		UPDATE stocks.stocks
-		SET available = available - $1, reserved = reserved - $1
+		SET reserved = reserved - $1
 		WHERE id = $2`, count, sku)
 	if err != nil {
 		log.Printf("Failed to update stock: %v", err)

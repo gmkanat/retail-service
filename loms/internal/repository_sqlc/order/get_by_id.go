@@ -14,39 +14,38 @@ func (r *Repository) GetByID(ctx context.Context, orderID int64) (*model.Order, 
 		return nil, err
 	}
 	q := pgordersqry.New(reader)
-
-	order, err := q.GetOrderById(ctx, orderID)
+	log.Printf("Getting order %d", orderID)
+	orderItems, err := q.GetOrderWithItems(ctx, orderID)
 	if err != nil {
-		log.Printf("Failed to get order: %v", err)
+		log.Printf("Failed to get order and items: %v", err)
 		return nil, err
 	}
 
-	items, err := q.GetOrderItems(ctx, orderID)
-	if err != nil {
-		log.Printf("Failed to get order items: %v", err)
-		return nil, err
-	}
+	var order model.Order
+	var items []model.Item
+	var status string
 
-	var orderItems []model.Item
-	for _, item := range items {
-		orderItems = append(orderItems, model.Item{
-			SKU:   uint32(item.SkuID),
-			Count: uint16(item.Count),
+	for _, orderItem := range orderItems {
+		order = model.Order{
+			UserID:    orderItem.UserID,
+			CreatedAt: orderItem.CreatedAt.Time,
+			UpdatedAt: orderItem.UpdatedAt.Time,
+		}
+		items = append(items, model.Item{
+			SKU:   uint32(orderItem.SkuID),
+			Count: uint16(orderItem.Count),
 		})
+		status = string(orderItem.Status)
 	}
 
-	orderStatus, err := model.OrderStatusFromString(string(order.Status))
+	order.Status, err = model.OrderStatusFromString(status)
 	if err != nil {
 		log.Printf("Invalid order status: %v", err)
 		return nil, err
 	}
 
-	return &model.Order{
-		OrderID:   order.ID,
-		UserID:    order.UserID,
-		Status:    orderStatus,
-		CreatedAt: order.CreatedAt.Time,
-		UpdatedAt: order.UpdatedAt.Time,
-		Items:     orderItems,
-	}, nil
+	log.Printf("Order %d found", orderID)
+
+	order.Items = items
+	return &order, nil
 }

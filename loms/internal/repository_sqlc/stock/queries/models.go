@@ -65,6 +65,7 @@ type OrdersOrder struct {
 }
 
 type OrdersOrderItem struct {
+	ID        int64
 	SkuID     int64
 	OrderID   int64
 	Count     int64

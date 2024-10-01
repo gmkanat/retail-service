@@ -14,8 +14,6 @@ func (r *Repository) ReserveRemove(ctx context.Context, sku uint32, count uint16
 		return err
 	}
 
-	q := pgstocksqry.New(writer)
-
 	tx, err := writer.Begin(ctx)
 	if err != nil {
 		log.Printf("Failed to start transaction: %v", err)
@@ -24,24 +22,31 @@ func (r *Repository) ReserveRemove(ctx context.Context, sku uint32, count uint16
 
 	defer tx.Rollback(ctx)
 
+	q := pgstocksqry.New(writer).WithTx(tx)
+
 	skuRow, err := q.GetStockBySKU(ctx, int64(sku))
 	if err != nil {
 		log.Printf("Failed to get stock: %v", err)
 		return err
 	}
 
-	if uint16(skuRow.Available) < count {
-		log.Printf("Not enough available stock for sku %d", sku)
-		return customerrors.ErrInsufficientStock
+	if uint16(skuRow.Reserved) < count {
+		log.Printf("Not enough reserved stock for sku %d", sku)
+		return customerrors.ErrNotEnoughReservedStock
 	}
 
 	err = q.ReserveRemoveStock(ctx, pgstocksqry.ReserveRemoveStockParams{
-		ID:        int64(sku),
-		Available: int64(count),
+		ID:       int64(sku),
+		Reserved: int64(count),
 	})
 
 	if err != nil {
 		log.Printf("Failed to reserve and remove stock: %v", err)
+		return err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		log.Printf("Failed to commit transaction: %v", err)
 		return err
 	}
 	return nil

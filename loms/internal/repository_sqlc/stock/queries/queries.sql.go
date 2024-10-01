@@ -42,33 +42,33 @@ func (q *Queries) GetStockBySKU(ctx context.Context, id int64) (GetStockBySKURow
 
 const releaseStock = `-- name: ReleaseStock :exec
 UPDATE stocks.stocks
-SET reserved = reserved - $2
+SET available = available + $2, reserved = reserved - $2
 WHERE id = $1 AND reserved >= $2
 `
 
 type ReleaseStockParams struct {
-	ID       int64
-	Reserved int64
+	ID        int64
+	Available int64
 }
 
 func (q *Queries) ReleaseStock(ctx context.Context, arg ReleaseStockParams) error {
-	_, err := q.db.Exec(ctx, releaseStock, arg.ID, arg.Reserved)
+	_, err := q.db.Exec(ctx, releaseStock, arg.ID, arg.Available)
 	return err
 }
 
 const reserveRemoveStock = `-- name: ReserveRemoveStock :exec
 UPDATE stocks.stocks
-SET available = available + $2, reserved = reserved - $2
+SET reserved = reserved - $2
 WHERE id = $1 AND reserved >= $2
 `
 
 type ReserveRemoveStockParams struct {
-	ID        int64
-	Available int64
+	ID       int64
+	Reserved int64
 }
 
 func (q *Queries) ReserveRemoveStock(ctx context.Context, arg ReserveRemoveStockParams) error {
-	_, err := q.db.Exec(ctx, reserveRemoveStock, arg.ID, arg.Available)
+	_, err := q.db.Exec(ctx, reserveRemoveStock, arg.ID, arg.Reserved)
 	return err
 }
 

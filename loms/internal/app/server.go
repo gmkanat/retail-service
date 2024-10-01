@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var _ servicepb.LomsServer = (*Service)(nil)
@@ -82,9 +83,11 @@ func (s *Service) OrderInfo(ctx context.Context, req *servicepb.OrderInfoRequest
 	}
 
 	return &servicepb.OrderInfoResponse{
-		Status: order.Status.String(),
-		Items:  items,
-		User:   order.UserID,
+		Status:    order.Status.String(),
+		Items:     items,
+		User:      order.UserID,
+		CreatedAt: timestamppb.New(order.CreatedAt),
+		UpdatedAt: timestamppb.New(order.UpdatedAt),
 	}, nil
 }
 

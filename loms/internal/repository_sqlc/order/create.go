@@ -13,7 +13,6 @@ func (r *Repository) Create(ctx context.Context, userID int64, items []model.Ite
 		log.Printf("Failed to get writer: %v", err)
 		return 0, err
 	}
-	q := pgordersqry.New(writer)
 
 	tx, err := writer.Begin(ctx)
 	if err != nil {
@@ -22,6 +21,8 @@ func (r *Repository) Create(ctx context.Context, userID int64, items []model.Ite
 	}
 
 	defer tx.Rollback(ctx)
+
+	q := pgordersqry.New(writer).WithTx(tx)
 
 	orderID, err := q.CreateOrder(ctx, pgordersqry.CreateOrderParams{
 		UserID:    userID,

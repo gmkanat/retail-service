@@ -14,8 +14,6 @@ func (r *Repository) Reserve(ctx context.Context, sku uint32, count uint16) erro
 		return err
 	}
 
-	q := pgstocksqry.New(writer)
-
 	tx, err := writer.Begin(ctx)
 	if err != nil {
 		log.Printf("Failed to start transaction: %v", err)
@@ -23,6 +21,8 @@ func (r *Repository) Reserve(ctx context.Context, sku uint32, count uint16) erro
 	}
 
 	defer tx.Rollback(ctx)
+
+	q := pgstocksqry.New(writer).WithTx(tx)
 
 	skuRow, err := q.GetStockBySKU(ctx, int64(sku))
 	if err != nil {
@@ -41,6 +41,11 @@ func (r *Repository) Reserve(ctx context.Context, sku uint32, count uint16) erro
 	})
 	if err != nil {
 		log.Printf("Failed to reserve stock: %v", err)
+		return err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		log.Printf("Failed to commit transaction: %v", err)
 		return err
 	}
 

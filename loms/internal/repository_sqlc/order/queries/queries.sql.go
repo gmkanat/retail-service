@@ -36,46 +36,47 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (int64
 	return id, err
 }
 
-const getOrderById = `-- name: GetOrderById :one
-SELECT id, user_id, status, created_at, updated_at
-FROM orders.orders
-WHERE id = $1
+const getOrderWithItems = `-- name: GetOrderWithItems :many
+SELECT
+  o.id, o.user_id, o.status, o.created_at, o.updated_at,
+  CAST(COALESCE(oi.sku_id, 0) AS BIGINT) AS sku_id,
+  CAST(COALESCE(oi.count, 0) AS BIGINT) AS count
+FROM
+  orders.orders o
+    LEFT JOIN
+  orders.order_items oi ON o.id = oi.order_id
+WHERE
+  o.id = $1
 `
 
-func (q *Queries) GetOrderById(ctx context.Context, id int64) (OrdersOrder, error) {
-	row := q.db.QueryRow(ctx, getOrderById, id)
-	var i OrdersOrder
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.Status,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+type GetOrderWithItemsRow struct {
+	ID        int64
+	UserID    int64
+	Status    OrdersOrderStatus
+	CreatedAt pgtype.Timestamp
+	UpdatedAt pgtype.Timestamp
+	SkuID     int64
+	Count     int64
 }
 
-const getOrderItems = `-- name: GetOrderItems :many
-SELECT sku_id, count
-FROM orders.order_items
-WHERE order_id = $1
-`
-
-type GetOrderItemsRow struct {
-	SkuID int64
-	Count int64
-}
-
-func (q *Queries) GetOrderItems(ctx context.Context, orderID int64) ([]GetOrderItemsRow, error) {
-	rows, err := q.db.Query(ctx, getOrderItems, orderID)
+func (q *Queries) GetOrderWithItems(ctx context.Context, id int64) ([]GetOrderWithItemsRow, error) {
+	rows, err := q.db.Query(ctx, getOrderWithItems, id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetOrderItemsRow
+	var items []GetOrderWithItemsRow
 	for rows.Next() {
-		var i GetOrderItemsRow
-		if err := rows.Scan(&i.SkuID, &i.Count); err != nil {
+		var i GetOrderWithItemsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.SkuID,
+			&i.Count,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

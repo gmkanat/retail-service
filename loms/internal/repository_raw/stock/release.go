@@ -51,10 +51,10 @@ func (r *Repository) Release(ctx context.Context, sku uint32, count uint16) erro
 		return err
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err = tx.Commit(ctx); err != nil {
 		log.Printf("Failed to commit transaction: %v", err)
 		return err
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }
