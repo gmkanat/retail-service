@@ -1,11 +1,11 @@
-package grpc_suite
+package suite
 
 import (
 	"context"
 	"github.com/stretchr/testify/suite"
-	loms "gitlab.ozon.dev/kanat_9999/homework/cart/pkg/api/proto/v1"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/customerrors"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/model"
+	loms "gitlab.ozon.dev/kanat_9999/homework/loms/pkg/api/proto/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,14 +22,14 @@ const (
 	CancelSKUID = 2956315
 )
 
-type GRPCSuite struct {
+type InMemSuite struct {
 	suite.Suite
 	client loms.LomsClient
 	conn   *grpc.ClientConn
 	cancel context.CancelFunc
 }
 
-func (s *GRPCSuite) SetupSuite() {
+func (s *InMemSuite) SetupSuite() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 
@@ -42,13 +42,13 @@ func (s *GRPCSuite) SetupSuite() {
 	s.client = loms.NewLomsClient(conn)
 }
 
-func (s *GRPCSuite) removeOrders(skuIDs ...int64) {
+func (s *InMemSuite) removeOrders(skuIDs ...int64) {
 	for _, skuID := range skuIDs {
 		_, err := s.client.OrderCancel(context.Background(), &loms.OrderCancelRequest{OrderId: skuID})
 		s.Require().NoError(err)
 	}
 }
-func (s *GRPCSuite) TearDownSuite() {
+func (s *InMemSuite) TearDownSuite() {
 	s.conn.Close()
 	s.cancel()
 }
@@ -69,7 +69,7 @@ var setupOrderReq = &loms.OrderCreateRequest{
 	},
 }
 
-func (s *GRPCSuite) TestOrderCreate() {
+func (s *InMemSuite) TestOrderCreate() {
 	tests := []struct {
 		name           string
 		req            *loms.OrderCreateRequest
@@ -129,7 +129,7 @@ func (s *GRPCSuite) TestOrderCreate() {
 }
 
 // TestOrderPay used PaySKUID, we can't roll back it
-func (s *GRPCSuite) TestOrderPay() {
+func (s *InMemSuite) TestOrderPay() {
 	var OrderId int64
 	items := []*loms.Item{
 		{
@@ -198,7 +198,7 @@ func (s *GRPCSuite) TestOrderPay() {
 	}
 }
 
-func (s *GRPCSuite) TestOrderCancel() {
+func (s *InMemSuite) TestOrderCancel() {
 	var OrderId int64
 	items := []*loms.Item{
 		{
@@ -264,7 +264,7 @@ func (s *GRPCSuite) TestOrderCancel() {
 	}
 }
 
-func (s *GRPCSuite) TestOrderInfo() {
+func (s *InMemSuite) TestOrderInfo() {
 	tests := []struct {
 		name        string
 		req         *loms.OrderInfoRequest
@@ -310,7 +310,7 @@ func (s *GRPCSuite) TestOrderInfo() {
 	}
 }
 
-func (s *GRPCSuite) StocksInfo() {
+func (s *InMemSuite) StocksInfo() {
 	tests := []struct {
 		name         string
 		req          *loms.StocksInfoRequest

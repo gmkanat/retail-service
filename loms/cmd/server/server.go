@@ -2,20 +2,21 @@ package main
 
 import (
 	"context"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/jackc/pgx/v5/pgxpool"
+	httpSwagger "github.com/swaggo/http-swagger"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/pgcluster"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/reflection"
 	"log"
 	"net"
 	"net/http"
 
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	httpSwagger "github.com/swaggo/http-swagger"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/reflection"
-
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/app"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/config"
-	orderRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository/order"
-	stockRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository/stock"
+	orderRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_sqlc/order"
+	stockRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_sqlc/stock"
 	orderService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/order"
 	stockService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/stock"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/middleware"
@@ -25,20 +26,42 @@ import (
 func main() {
 	cfg := config.Load()
 
-	server := setupServices(cfg)
+	cluster, err := setupDatabaseCluster(cfg)
+	if err != nil {
+		log.Fatalf("Failed to setup database cluster: %v", err)
+	}
+	defer cluster.Close()
+
+	server := setupServices(cluster)
 
 	go startGRPCServer(cfg, server)
 	startHTTPServer(cfg, server)
 }
 
-func setupServices(cfg *config.AppConfig) *app.Service {
-	initialStocks, err := config.LoadStocks(cfg.StockFile)
+func setupDatabaseCluster(cfg *config.AppConfig) (*pgcluster.Cluster, error) {
+	ctx := context.Background()
+
+	masterPool, err := pgxpool.New(ctx, cfg.MasterDBURL)
 	if err != nil {
-		log.Fatalf("failed to load stock data: %v", err)
+		return nil, err
 	}
 
-	orderRepo := orderRepository.NewOrderRepository()
-	stockRepo := stockRepository.NewStockRepository(initialStocks)
+	slavePool, err := pgxpool.New(ctx, cfg.ReplicaDBURL)
+	if err != nil {
+		return nil, err
+	}
+
+	cluster := pgcluster.New().
+		SetWriter(masterPool).
+		AddReader(slavePool)
+
+	return cluster, nil
+}
+
+func setupServices(cluster *pgcluster.Cluster) *app.Service {
+	orderRepo := orderRepository.NewRepository(cluster)
+	stockRepo := stockRepository.NewRepository(cluster)
+
 	orderSvc := orderService.NewOrderService(orderRepo, stockRepo)
 	stockSvc := stockService.NewStockService(stockRepo)
 

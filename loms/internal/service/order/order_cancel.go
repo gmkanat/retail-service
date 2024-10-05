@@ -10,6 +10,7 @@ func (s *Service) OrderCancel(ctx context.Context, orderID int64) error {
 	if orderID <= 0 {
 		return customerrors.ErrInvalidOrderId
 	}
+
 	order, err := s.orderRepository.GetByID(ctx, orderID)
 	if err != nil {
 		return err
