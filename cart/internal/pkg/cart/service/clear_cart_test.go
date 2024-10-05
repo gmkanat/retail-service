@@ -13,6 +13,8 @@ import (
 )
 
 func TestCartService_ClearCart(t *testing.T) {
+	t.Parallel()
+
 	mc := minimock.NewController(t)
 	repoMock := mocks.NewCartRepositoryMock(mc)
 	cartService := service.NewService(repoMock, nil, nil)

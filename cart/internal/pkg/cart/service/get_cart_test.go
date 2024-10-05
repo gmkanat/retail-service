@@ -15,6 +15,8 @@ import (
 )
 
 func TestCartService_GetCart(t *testing.T) {
+	t.Parallel()
+
 	mc := minimock.NewController(t)
 	repoMock := mocks.NewCartRepositoryMock(mc)
 	productMock := mocks.NewProductServiceMock(mc)
@@ -52,7 +54,7 @@ func TestCartService_GetCart(t *testing.T) {
 			Name:  "Кроссовки Nike JORDAN",
 			Price: 100,
 		}
-		productMock.GetProductMock.Expect(ctx, int64(1000)).Return(&product, nil)
+		productMock.GetProductMock.Expect(minimock.AnyContext, int64(1000)).Return(&product, nil)
 
 		cartResponse, err := cartService.GetCart(ctx, int64(123))
 		require.NoError(t, err)
@@ -71,7 +73,7 @@ func TestCartService_GetCart(t *testing.T) {
 
 		repoMock.GetCartMock.Expect(ctx, int64(123)).Return([]model.CartItem{cartItem}, nil)
 
-		productMock.GetProductMock.Expect(ctx, int64(1000)).Return(nil, errors.New("product not found"))
+		productMock.GetProductMock.Expect(minimock.AnyContext, int64(1000)).Return(nil, errors.New("product not found"))
 
 		_, err := cartService.GetCart(ctx, int64(123))
 		require.Error(t, err)

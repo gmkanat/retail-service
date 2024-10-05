@@ -15,6 +15,8 @@ import (
 )
 
 func TestCartService_AddItem(t *testing.T) {
+	t.Parallel()
+
 	mc := minimock.NewController(t)
 
 	repoMock := mocks.NewCartRepositoryMock(mc)

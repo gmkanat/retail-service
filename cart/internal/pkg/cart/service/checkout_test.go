@@ -13,6 +13,8 @@ import (
 )
 
 func TestCartService_Checkout(t *testing.T) {
+	t.Parallel()
+
 	mc := minimock.NewController(t)
 	cartRepoMock := mocks.NewCartRepositoryMock(mc)
 	lomsClientMock := mocks.NewLomsClientMock(mc)

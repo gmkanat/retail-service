@@ -16,6 +16,8 @@ services:
       - MAX_RETRIES=3
       - INITIAL_BACKOFF=500ms
       - LOMS_ADDR=loms:50051
+      - RATE_LIMIT=10
+      - BURST_LIMIT=10
     networks:
       - backend
     depends_on:
