@@ -1,4 +1,4 @@
-package grpc_suite
+package suite
 
 import (
 	"context"

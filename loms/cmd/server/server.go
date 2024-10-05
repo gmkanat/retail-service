@@ -37,6 +37,7 @@ func main() {
 	go startGRPCServer(cfg, server)
 	startHTTPServer(cfg, server)
 }
+
 func setupDatabaseCluster(cfg *config.AppConfig) (*pgcluster.Cluster, error) {
 	ctx := context.Background()
 
