@@ -23,13 +23,13 @@ func TestCartService_ClearCart(t *testing.T) {
 	userID := int64(123)
 
 	t.Run("Invalid userId", func(t *testing.T) {
+		t.Parallel()
 		err := cartService.ClearCart(ctx, 0)
 		require.Error(t, err)
 		require.Equal(t, customerrors.InvalidUserId, err)
 	})
 
-	t.Run("Success", func(t *testing.T) {
-		// add item, then clear cart
+	t.Run("Success", func(t *testing.T) { // add item, then clear cart
 		cartItem := model.CartItem{
 			SkuId: 1000,
 			Name:  "Кроссовки Nike JORDAN",

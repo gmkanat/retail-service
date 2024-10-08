@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/product/roundtripper"
-	"golang.org/x/time/rate"
 	"log"
 	"net/http"
 	"os"
@@ -30,7 +29,9 @@ func main() {
 	cfg := config.Load()
 	log.Println("App starting")
 
-	cartSvc := setupServices(cfg)
+	cartSvc, rateLimiter := setupServices(cfg)
+	defer rateLimiter.Shutdown()
+
 	srv := server.New(cartSvc)
 
 	mux := setupRoutes(srv)
@@ -64,8 +65,8 @@ func main() {
 	log.Println("Server gracefully shutdown.")
 }
 
-func setupServices(cfg *config.Config) *cartService.CartService {
-	httpClient := createHTTPClient(cfg)
+func setupServices(cfg *config.Config) (*cartService.CartService, *roundtripper.CustomRateLimitedTransport) {
+	httpClient, rateLimiter := createHTTPClient(cfg)
 	productSvc := productService.NewProductService(cfg.BaseURL, cfg.Token, httpClient)
 
 	cartRepository := repository.NewCartStorageRepository()
@@ -73,22 +74,20 @@ func setupServices(cfg *config.Config) *cartService.CartService {
 	lomsClient := createLomsClient(cfg.LomsAddr)
 	lomsSvc := loms.NewClient(lomsClient)
 
-	return cartService.NewService(cartRepository, productSvc, lomsSvc)
+	return cartService.NewService(cartRepository, productSvc, lomsSvc), rateLimiter
 }
 
-func createHTTPClient(cfg *config.Config) *http.Client {
+func createHTTPClient(cfg *config.Config) (*http.Client, *roundtripper.CustomRateLimitedTransport) {
 	retryTransport := transport.NewRetryRoundTripper(http.DefaultTransport, cfg.MaxRetries, cfg.InitialBackoff)
 
-	limiter := rate.NewLimiter(cfg.RateLimit, cfg.BurstLimit)
-
-	rateLimitedTransport := &roundtripper.RateLimitedTransport{
-		Transport: retryTransport,
-		Limiter:   limiter,
+	rateLimitedTransport, err := roundtripper.NewCustomRateLimitedTransport(retryTransport, cfg.RateLimit, cfg.BurstLimit)
+	if err != nil {
+		log.Fatalf("Failed to set rate limiter: %v", err)
 	}
 
 	return &http.Client{
 		Transport: rateLimitedTransport,
-	}
+	}, rateLimitedTransport
 }
 
 func createLomsClient(lomsAddr string) proto.LomsClient {

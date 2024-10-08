@@ -9,21 +9,22 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/product/roundtripper"
-	"golang.org/x/time/rate"
 )
 
-func TestRateLimitedTransport(t *testing.T) {
-	limiter := rate.NewLimiter(10, 10)
+func TestCustomRateLimitedTransport(t *testing.T) {
+	rateLimit := 10 // 10 RPS
+	burstLimit := 10
 
-	rateLimitedTransport := &roundtripper.RateLimitedTransport{
-		Transport: http.DefaultTransport,
-		Limiter:   limiter,
+	rateLimitedTransport, err := roundtripper.NewCustomRateLimitedTransport(http.DefaultTransport, rateLimit, burstLimit)
+	require.NoError(t, err, "failed to set rate limiter")
+
+	client := &http.Client{
+		Transport: rateLimitedTransport,
 	}
-
-	var wg sync.WaitGroup
 
 	numRequests := 30
 
+	var wg sync.WaitGroup
 	startTime := time.Now()
 
 	for i := 0; i < numRequests; i++ {
@@ -31,12 +32,8 @@ func TestRateLimitedTransport(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 
-			req, err := http.NewRequest("GET", "https://www.google.kz", nil)
+			req, err := http.NewRequest("GET", "https://httpbin.org/anything", nil)
 			require.NoError(t, err)
-
-			client := &http.Client{
-				Transport: rateLimitedTransport,
-			}
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -58,7 +55,7 @@ func TestRateLimitedTransport(t *testing.T) {
 	totalTime := time.Since(startTime)
 	fmt.Printf("total time of %d requests: %v\n", numRequests, totalTime)
 
-	expectedDuration := time.Duration(numRequests/10) * time.Second
+	expectedDuration := time.Duration(numRequests/rateLimit) * time.Second
 	if totalTime < expectedDuration {
 		t.Errorf("finished quickly, expected minimum %v, but it was %v", expectedDuration, totalTime)
 	}

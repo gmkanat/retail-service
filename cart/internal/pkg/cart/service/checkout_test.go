@@ -30,6 +30,7 @@ func TestCartService_Checkout(t *testing.T) {
 	}
 
 	t.Run("invalid userId", func(t *testing.T) {
+		t.Parallel()
 		invalidUserID := int64(0)
 		_, err := cartSvc.Checkout(ctx, invalidUserID)
 		require.ErrorIs(t, err, customerrors.InvalidUserId)

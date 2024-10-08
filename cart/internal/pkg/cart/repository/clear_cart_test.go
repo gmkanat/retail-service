@@ -2,9 +2,7 @@ package repository_test
 
 import (
 	"context"
-	"github.com/gojuno/minimock/v3"
 	"github.com/stretchr/testify/assert"
-	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/mocks"
 	"go.uber.org/goleak"
 	"sync"
 	"testing"
@@ -54,8 +52,7 @@ func TestCartStorageRepository_ClearCart(t *testing.T) {
 func TestCartStorageRepository_ClearCart_Concurrent(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
-	mc := minimock.NewController(t)
-	repoMock := mocks.NewCartRepositoryMock(mc)
+	repo := repository.NewCartStorageRepository()
 
 	ctx := context.Background()
 
@@ -66,12 +63,8 @@ func TestCartStorageRepository_ClearCart_Concurrent(t *testing.T) {
 		Price: 200,
 	}
 
-	repoMock.AddItemMock.Expect(ctx, int64(1), item).Return(nil)
-
-	err := repoMock.AddItem(ctx, 1, item)
+	err := repo.AddItem(ctx, 1, item)
 	assert.NoError(t, err)
-
-	repoMock.ClearCartMock.Expect(ctx, int64(1)).Return(nil)
 
 	wg := sync.WaitGroup{}
 	goroutinesCount := 10
@@ -80,15 +73,14 @@ func TestCartStorageRepository_ClearCart_Concurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			err := repoMock.ClearCart(ctx, 1)
+			err := repo.ClearCart(ctx, 1)
 			assert.NoError(t, err)
 		}()
 	}
 
 	wg.Wait()
 
-	repoMock.GetCartMock.Expect(ctx, int64(1)).Return([]model.CartItem{}, nil)
-	items, err := repoMock.GetCart(ctx, 1)
+	items, err := repo.GetCart(ctx, 1)
 	assert.NoError(t, err)
 	assert.Len(t, items, 0)
 }

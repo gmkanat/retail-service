@@ -2,10 +2,8 @@ package repository_test
 
 import (
 	"context"
-	"github.com/gojuno/minimock/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/mocks"
 	"go.uber.org/goleak"
 	"sync"
 	"testing"
@@ -63,22 +61,20 @@ func TestCartStorageRepository_AddItem(t *testing.T) {
 func TestCartStorageRepository_AddItem_Concurrent(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
-	mc := minimock.NewController(t)
-	repoMock := mocks.NewCartRepositoryMock(mc)
+	repo := repository.NewCartStorageRepository()
 
 	ctx := context.Background()
 	itemCount := 200
 	expectedItems := make([]model.CartItem, itemCount)
 
 	for i := 0; i < itemCount; i++ {
-		curItem := &model.CartItem{
-			SkuId: int64(1000),
+		curItem := model.CartItem{
+			SkuId: int64(1000 + i),
 			Name:  "Кроссовки Nike JORDAN",
 			Count: 1,
 			Price: 200,
 		}
-		expectedItems[i] = *curItem
-		repoMock.AddItemMock.Expect(ctx, int64(1), curItem).Return(nil)
+		expectedItems[i] = curItem
 	}
 
 	wg := sync.WaitGroup{}
@@ -86,16 +82,15 @@ func TestCartStorageRepository_AddItem_Concurrent(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			err := repoMock.AddItem(ctx, 1, &expectedItems[i])
+			err := repo.AddItem(ctx, 1, &expectedItems[i])
 			assert.NoError(t, err)
 		}(i)
 	}
 
 	wg.Wait()
 
-	repoMock.GetCartMock.Expect(ctx, int64(1)).Return(expectedItems, nil)
-	items, err := repoMock.GetCart(ctx, 1)
+	items, err := repo.GetCart(ctx, 1)
 
 	assert.NoError(t, err)
-	assert.Len(t, items, itemCount)
+	assert.Equal(t, len(items), itemCount)
 }

@@ -18,6 +18,5 @@ func (r *CartStorageRepository) AddItem(ctx context.Context, userId int64, cartI
 	} else {
 		r.cartStorage[userId][cartItem.SkuId] = cartItem
 	}
-
 	return nil
 }

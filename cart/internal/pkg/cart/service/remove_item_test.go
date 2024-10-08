@@ -24,12 +24,14 @@ func TestCartService_RemoveItem(t *testing.T) {
 	skuID := int64(1000)
 
 	t.Run("Invalid userId", func(t *testing.T) {
+		t.Parallel()
 		err := cartService.RemoveItem(ctx, 0, skuID)
 		require.Error(t, err)
 		require.Equal(t, customerrors.InvalidUserId, err)
 	})
 
 	t.Run("Invalid skuId", func(t *testing.T) {
+		t.Parallel()
 		err := cartService.RemoveItem(ctx, userID, 0)
 		require.Error(t, err)
 		require.Equal(t, customerrors.InvalidSkuId, err)

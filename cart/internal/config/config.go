@@ -1,7 +1,6 @@
 package config
 
 import (
-	"golang.org/x/time/rate"
 	"log"
 	"os"
 	"strconv"
@@ -15,7 +14,7 @@ type Config struct {
 	PortAddr       string
 	MaxRetries     int
 	InitialBackoff time.Duration
-	RateLimit      rate.Limit
+	RateLimit      int
 	BurstLimit     int
 }
 
@@ -53,7 +52,7 @@ func Load() *Config {
 	}
 
 	rateLimitStr := os.Getenv("RATE_LIMIT")
-	rateLimit, err := strconv.ParseFloat(rateLimitStr, 64)
+	rateLimit, err := strconv.Atoi(rateLimitStr)
 	if err != nil {
 		log.Fatalf("Invalid RATE_LIMIT value: %v", err)
 	}
@@ -71,7 +70,7 @@ func Load() *Config {
 		MaxRetries:     maxRetries,
 		InitialBackoff: initialBackoff,
 		LomsAddr:       lomsAddr,
-		RateLimit:      rate.Limit(rateLimit),
+		RateLimit:      rateLimit,
 		BurstLimit:     burstLimit,
 	}
 }

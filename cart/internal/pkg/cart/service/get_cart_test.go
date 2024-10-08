@@ -26,6 +26,7 @@ func TestCartService_GetCart(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Invalid userId", func(t *testing.T) {
+		t.Parallel()
 		_, err := cartService.GetCart(ctx, 0)
 		require.Error(t, err)
 		require.Equal(t, customerrors.InvalidUserId, err)
@@ -64,6 +65,7 @@ func TestCartService_GetCart(t *testing.T) {
 	})
 
 	t.Run("ProductService error", func(t *testing.T) {
+		t.Parallel()
 		cartItem := model.CartItem{
 			SkuId: 1000,
 			Name:  "Test Product",
