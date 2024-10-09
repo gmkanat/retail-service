@@ -14,6 +14,8 @@ type Config struct {
 	PortAddr       string
 	MaxRetries     int
 	InitialBackoff time.Duration
+	RateLimit      int
+	BurstLimit     int
 }
 
 func Load() *Config {
@@ -49,6 +51,18 @@ func Load() *Config {
 		log.Fatalf("Invalid INITIAL_BACKOFF value: %v", err)
 	}
 
+	rateLimitStr := os.Getenv("RATE_LIMIT")
+	rateLimit, err := strconv.Atoi(rateLimitStr)
+	if err != nil {
+		log.Fatalf("Invalid RATE_LIMIT value: %v", err)
+	}
+
+	burstLimitStr := os.Getenv("BURST_LIMIT")
+	burstLimit, err := strconv.Atoi(burstLimitStr)
+	if err != nil {
+		log.Fatalf("Invalid BURST_LIMIT value: %v", err)
+	}
+
 	return &Config{
 		BaseURL:        baseURL,
 		Token:          token,
@@ -56,5 +70,7 @@ func Load() *Config {
 		MaxRetries:     maxRetries,
 		InitialBackoff: initialBackoff,
 		LomsAddr:       lomsAddr,
+		RateLimit:      rateLimit,
+		BurstLimit:     burstLimit,
 	}
 }

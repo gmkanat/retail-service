@@ -2,6 +2,8 @@ package repository_test
 
 import (
 	"context"
+	"go.uber.org/goleak"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,6 +12,8 @@ import (
 )
 
 func TestCartStorageRepository_GetCart(t *testing.T) {
+	t.Parallel()
+
 	repo := repository.NewCartStorageRepository()
 	ctx := context.Background()
 
@@ -42,4 +46,43 @@ func TestCartStorageRepository_GetCart(t *testing.T) {
 		require.Equal(t, cartItem.Count, items[0].Count)
 		require.Equal(t, cartItem.Price, items[0].Price)
 	})
+}
+
+func TestCartStorageRepository_GetCart_Concurrent(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
+	repo := repository.NewCartStorageRepository()
+	ctx := context.Background()
+
+	userId := int64(1)
+	cartItem := &model.CartItem{
+		SkuId: 1000,
+		Name:  "Кроссовки Nike JORDAN",
+		Count: 2,
+		Price: 200,
+	}
+
+	err := repo.AddItem(ctx, userId, cartItem)
+	require.NoError(t, err)
+
+	goroutineCount := 10
+	wg := sync.WaitGroup{}
+
+	for i := 0; i < goroutineCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			items, err := repo.GetCart(ctx, userId)
+			require.NoError(t, err)
+			require.NotEmpty(t, items)
+			require.Len(t, items, 1)
+			require.Equal(t, cartItem.SkuId, items[0].SkuId)
+			require.Equal(t, cartItem.Name, items[0].Name)
+			require.Equal(t, cartItem.Count, items[0].Count)
+			require.Equal(t, cartItem.Price, items[0].Price)
+		}()
+	}
+
+	wg.Wait()
 }

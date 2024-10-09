@@ -15,6 +15,8 @@ import (
 )
 
 func TestCartService_AddItem(t *testing.T) {
+	t.Parallel()
+
 	mc := minimock.NewController(t)
 
 	repoMock := mocks.NewCartRepositoryMock(mc)
@@ -25,24 +27,28 @@ func TestCartService_AddItem(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("Invalid userId", func(t *testing.T) {
+		t.Parallel()
 		err := cartService.AddItem(ctx, 0, 1, 1)
 		require.Error(t, err)
 		require.Equal(t, customerrors.InvalidUserId, err)
 	})
 
 	t.Run("Invalid skuId", func(t *testing.T) {
+		t.Parallel()
 		err := cartService.AddItem(ctx, 1, 0, 1)
 		require.Error(t, err)
 		require.Equal(t, customerrors.InvalidSkuId, err)
 	})
 
 	t.Run("Invalid count", func(t *testing.T) {
+		t.Parallel()
 		err := cartService.AddItem(ctx, 1, 1, 0)
 		require.Error(t, err)
 		require.Equal(t, customerrors.InvalidCount, err)
 	})
 
 	t.Run("ProductService error", func(t *testing.T) {
+		t.Parallel()
 		productMock.GetProductMock.Expect(ctx, int64(1000)).Return(nil, errors.New("product not found"))
 
 		err := cartService.AddItem(ctx, 1, 1000, 10)

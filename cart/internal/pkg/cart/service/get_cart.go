@@ -4,6 +4,8 @@ import (
 	"context"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/customerrors"
 	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/cart/model"
+	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/errgroup"
+	"log"
 )
 
 func (s *CartService) GetCart(ctx context.Context, userId int64) (*model.GetCartResponse, error) {
@@ -16,19 +18,37 @@ func (s *CartService) GetCart(ctx context.Context, userId int64) (*model.GetCart
 		return nil, err
 	}
 
-	totalPrice := uint32(0)
-	for _, item := range items {
-		product, err := s.productService.GetProduct(ctx, item.SkuId)
-		if err != nil {
-			return nil, err
-		}
+	totalPriceCh := make(chan uint32, len(items))
 
-		totalPrice += product.Price * uint32(item.Count)
+	g, gCtx := errgroup.WithContext(ctx)
+
+	for i := range items {
+		item := items[i]
+		g.Go(func() error {
+			log.Printf("getting product for skuId: %d", item.SkuId)
+
+			product, err := s.productService.GetProduct(gCtx, item.SkuId)
+			if err != nil {
+				return err
+			}
+			totalPriceCh <- product.Price * uint32(item.Count)
+			return nil
+		})
+	}
+
+	if err = g.Wait(); err != nil {
+		return nil, err
+	}
+
+	close(totalPriceCh)
+
+	var totalPrice uint32
+	for price := range totalPriceCh {
+		totalPrice += price
 	}
 
 	return &model.GetCartResponse{
 		Items:      items,
 		TotalPrice: totalPrice,
 	}, nil
-
 }

@@ -3,7 +3,7 @@ COGNIT_LIMIT = 15
 
 test-cover:
 	# ignore mock files
-	go test $(shell go list ./internal/pkg/cart/... | grep -v ./internal/pkg/cart/mocks) -v -coverprofile=coverage.out
+	go test -race $(shell go list ./internal/pkg/cart/... | grep -v ./internal/pkg/cart/mocks) -v -coverprofile=coverage.out
 	go tool cover -func=coverage.out
 
 test-e2e:

@@ -1,8 +1,15 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"gitlab.ozon.dev/kanat_9999/homework/cart/internal/pkg/product/roundtripper"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -22,20 +29,44 @@ func main() {
 	cfg := config.Load()
 	log.Println("App starting")
 
-	cartSvc := setupServices(cfg)
+	cartSvc, rateLimiter := setupServices(cfg)
+	defer rateLimiter.Shutdown()
+
 	srv := server.New(cartSvc)
 
 	mux := setupRoutes(srv)
 	logMux := middleware.LogMiddleware(mux)
 
-	log.Println("Server starting")
-	if err := http.ListenAndServe(cfg.PortAddr, logMux); err != nil {
-		log.Fatal(err)
+	httpServer := &http.Server{
+		Addr:    cfg.PortAddr,
+		Handler: logMux,
 	}
+
+	stopChan := make(chan os.Signal, 1)
+	signal.Notify(stopChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		log.Println("Server starting...")
+		if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) && err != nil {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	<-stopChan
+	log.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := httpServer.Shutdown(ctx); err != nil {
+		log.Fatalf("Server shutdown failed: %v", err)
+	}
+
+	log.Println("Server gracefully shutdown.")
 }
 
-func setupServices(cfg *config.Config) *cartService.CartService {
-	httpClient := createHTTPClient(cfg)
+func setupServices(cfg *config.Config) (*cartService.CartService, *roundtripper.CustomRateLimitedTransport) {
+	httpClient, rateLimiter := createHTTPClient(cfg)
 	productSvc := productService.NewProductService(cfg.BaseURL, cfg.Token, httpClient)
 
 	cartRepository := repository.NewCartStorageRepository()
@@ -43,12 +74,20 @@ func setupServices(cfg *config.Config) *cartService.CartService {
 	lomsClient := createLomsClient(cfg.LomsAddr)
 	lomsSvc := loms.NewClient(lomsClient)
 
-	return cartService.NewService(cartRepository, productSvc, lomsSvc)
+	return cartService.NewService(cartRepository, productSvc, lomsSvc), rateLimiter
 }
 
-func createHTTPClient(cfg *config.Config) *http.Client {
+func createHTTPClient(cfg *config.Config) (*http.Client, *roundtripper.CustomRateLimitedTransport) {
 	retryTransport := transport.NewRetryRoundTripper(http.DefaultTransport, cfg.MaxRetries, cfg.InitialBackoff)
-	return &http.Client{Transport: retryTransport}
+
+	rateLimitedTransport, err := roundtripper.NewCustomRateLimitedTransport(retryTransport, cfg.RateLimit, cfg.BurstLimit)
+	if err != nil {
+		log.Fatalf("Failed to set rate limiter: %v", err)
+	}
+
+	return &http.Client{
+		Transport: rateLimitedTransport,
+	}, rateLimitedTransport
 }
 
 func createLomsClient(lomsAddr string) proto.LomsClient {
