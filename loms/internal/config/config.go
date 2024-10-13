@@ -1,54 +1,74 @@
 package config
 
 import (
+	"log"
 	"os"
+	"strconv"
+	"time"
 )
 
 type AppConfig struct {
-	GRPCPort     string `json:"grpc_port"`
-	HTTPPort     string `json:"http_port"`
-	StockFile    string `json:"stock_file"`
-	SwaggerFile  string `json:"swagger_file"`
-	MasterDBURL  string `json:"master_db_url"`
-	ReplicaDBURL string `json:"replica_db_url"`
+	GRPCPort           string
+	HTTPPort           string
+	StockFile          string
+	SwaggerFile        string
+	MasterDBURL        string
+	ReplicaDBURL       string
+	Brokers            []string
+	Topic              string
+	Tick               time.Duration
+	BatchSize          int
+	OutboxPollInterval time.Duration
 }
 
 func Load() *AppConfig {
-	grpcPort := os.Getenv("LOMS_GRPC_PORT")
-	if grpcPort == "" {
-		grpcPort = ":50051"
-	}
-
-	httpPort := os.Getenv("LOMS_HTTP_PORT")
-	if httpPort == "" {
-		httpPort = ":8082"
-	}
-
-	stockFile := os.Getenv("LOMS_STOCK_FILE")
-	if stockFile == "" {
-		stockFile = "internal/config/stock-data.json"
-	}
-	swaggerFile := os.Getenv("LOMS_SWAGGER_FILE")
-	if swaggerFile == "" {
-		swaggerFile = "../api/openapiv2/loms.swagger.json"
-	}
-
-	masterDBURL := os.Getenv("LOMS_MASTER_DB_URL")
-	if masterDBURL == "" {
-		masterDBURL = "postgres://loms_user:loms_password@pg_master:5432/loms_db"
-	}
-
-	replicaDBURL := os.Getenv("LOMS_REPLICA_DB_URL")
-	if replicaDBURL == "" {
-		replicaDBURL = "postgres://loms_user:loms_password@pg_slave:5432/loms_db"
-	}
+	grpcPort := getEnv("LOMS_GRPC_PORT")
+	httpPort := getEnv("LOMS_HTTP_PORT")
+	stockFile := getEnv("LOMS_STOCK_FILE")
+	swaggerFile := getEnv("LOMS_SWAGGER_FILE")
+	masterDBURL := getEnv("LOMS_MASTER_DB_URL")
+	replicaDBURL := getEnv("LOMS_SLAVE_DB_URL")
+	brokers := []string{getEnv("KAFKA_BROKERS")}
+	topic := getEnv("KAFKA_TOPIC")
+	tick := parseDuration(getEnv("DISPATCHER_TICK"))
+	batchSize := parseInt(getEnv("DISPATCHER_BATCH_SIZE"))
+	outboxPollInterval := parseDuration(getEnv("LOMS_OUTBOX_POLL_INTERVAL"))
 
 	return &AppConfig{
-		GRPCPort:     grpcPort,
-		HTTPPort:     httpPort,
-		StockFile:    stockFile,
-		SwaggerFile:  swaggerFile,
-		MasterDBURL:  masterDBURL,
-		ReplicaDBURL: replicaDBURL,
+		GRPCPort:           grpcPort,
+		HTTPPort:           httpPort,
+		StockFile:          stockFile,
+		SwaggerFile:        swaggerFile,
+		MasterDBURL:        masterDBURL,
+		ReplicaDBURL:       replicaDBURL,
+		Brokers:            brokers,
+		Topic:              topic,
+		Tick:               tick,
+		BatchSize:          batchSize,
+		OutboxPollInterval: outboxPollInterval,
 	}
+}
+
+func getEnv(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("Environment variable %s is not set", key)
+	}
+	return value
+}
+
+func parseDuration(value string) time.Duration {
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		log.Fatalf("Invalid duration format for %s: %v", value, err)
+	}
+	return duration
+}
+
+func parseInt(value string) int {
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		log.Fatalf("Invalid integer format for %s: %v", value, err)
+	}
+	return parsed
 }

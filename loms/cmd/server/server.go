@@ -5,7 +5,6 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/jackc/pgx/v5/pgxpool"
 	httpSwagger "github.com/swaggo/http-swagger"
-	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/pgcluster"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -15,9 +14,13 @@ import (
 
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/app"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/config"
-	orderRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_sqlc/order"
-	stockRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_sqlc/stock"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/infra"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/pgcluster"
+	orderRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_raw/order"
+	outboxRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_raw/outbox"
+	stockRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_raw/stock"
 	orderService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/order"
+	outboxService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/outbox"
 	stockService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/stock"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/middleware"
 	proto "gitlab.ozon.dev/kanat_9999/homework/loms/pkg/api/proto/v1"
@@ -32,7 +35,17 @@ func main() {
 	}
 	defer cluster.Close()
 
-	server := setupServices(cluster)
+	kafkaProducer, err := infra.NewKafkaProducer(cfg.Brokers, cfg.Topic)
+	if err != nil {
+		log.Fatalf("Failed to create Kafka producer: %v", err)
+	}
+	defer kafkaProducer.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	server, cleanup := setupServices(ctx, cluster, kafkaProducer, cfg)
+	defer cleanup()
 
 	go startGRPCServer(cfg, server)
 	startHTTPServer(cfg, server)
@@ -58,14 +71,26 @@ func setupDatabaseCluster(cfg *config.AppConfig) (*pgcluster.Cluster, error) {
 	return cluster, nil
 }
 
-func setupServices(cluster *pgcluster.Cluster) *app.Service {
+func setupServices(
+	ctx context.Context,
+	cluster *pgcluster.Cluster,
+	kafkaProducer *infra.KafkaProducer,
+	cfg *config.AppConfig,
+) (*app.Service, func()) {
 	orderRepo := orderRepository.NewRepository(cluster)
 	stockRepo := stockRepository.NewRepository(cluster)
+	outboxRepo := outboxRepository.NewRepository(cluster, kafkaProducer)
+
+	outboxProcessor := outboxService.NewOutboxProcessor(outboxRepo, kafkaProducer, cfg.OutboxPollInterval)
 
 	orderSvc := orderService.NewOrderService(orderRepo, stockRepo)
 	stockSvc := stockService.NewStockService(stockRepo)
 
-	return app.NewService(orderSvc, stockSvc)
+	go outboxProcessor.Start(ctx)
+
+	return app.NewService(orderSvc, stockSvc), func() {
+		outboxProcessor.Stop()
+	}
 }
 
 func startGRPCServer(cfg *config.AppConfig, server *app.Service) {
