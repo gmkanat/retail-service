@@ -6,6 +6,7 @@ import (
 	"github.com/IBM/sarama"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/model"
 	"log"
+	"strconv"
 )
 
 type KafkaProducer struct {
@@ -34,8 +35,15 @@ func (kp *KafkaProducer) SendEvent(ctx context.Context, event *model.Event) erro
 	}
 
 	msg := &sarama.ProducerMessage{
+		Key:   sarama.StringEncoder(strconv.FormatInt(event.OrderID, 10)),
 		Topic: kp.topic,
 		Value: sarama.ByteEncoder(eventBytes),
+		Headers: []sarama.RecordHeader{
+			{
+				Key:   []byte("service"),
+				Value: []byte("Loms Service"),
+			},
+		},
 	}
 
 	_, _, err = kp.producer.SendMessage(msg)
