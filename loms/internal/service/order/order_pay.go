@@ -20,17 +20,18 @@ func (s *Service) OrderPay(ctx context.Context, orderID int64) error {
 		return customerrors.ErrOrderStatusAwaitingPayment
 	}
 
-	for _, item := range order.Items {
-		reserveRemoveStockErr := s.stockRepository.ReserveRemove(ctx, item.SKU, item.Count)
-		if reserveRemoveStockErr != nil {
-			return reserveRemoveStockErr
+	return s.txManager.WithRepeatableReadTx(ctx, func(c context.Context) error {
+		for _, item := range order.Items {
+			reserveRemoveStockErr := s.stockRepository.ReserveRemove(c, item.SKU, item.Count)
+			if reserveRemoveStockErr != nil {
+				return reserveRemoveStockErr
+			}
 		}
-	}
 
-	err = s.orderRepository.SetStatus(ctx, orderID, model.OrderStatusPayed)
-	if err != nil {
-		return err
-	}
-
-	return nil
+		err = s.orderRepository.SetStatus(c, orderID, model.OrderStatusPayed)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 }

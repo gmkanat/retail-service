@@ -12,38 +12,35 @@ func (s *Service) OrderCreate(ctx context.Context, userID int64, items []model.I
 		return 0, customerrors.ErrInvalidUserId
 	}
 
-	orderID, err := s.orderRepository.Create(ctx, userID, items)
-	if err != nil {
-		return 0, err
-	}
+	var orderID int64
 
-	var reservedItems []model.Item
-
-	for _, item := range items {
-		reserveStockErr := s.stockRepository.Reserve(ctx, item.SKU, item.Count)
-		if reserveStockErr != nil {
-			log.Printf("failed to reserve stock for order %d: %v", orderID, reserveStockErr)
-
-			// rollback stock reservation
-			for _, reservedItem := range reservedItems {
-				rollbackErr := s.stockRepository.Release(ctx, reservedItem.SKU, reservedItem.Count)
-				if rollbackErr != nil {
-					log.Printf("rollback failed for SKU: %d", reservedItem.SKU)
-				}
-			}
-
-			updateOrderErr := s.orderRepository.SetStatus(ctx, orderID, model.OrderStatusFailed)
-			if updateOrderErr != nil {
-				log.Printf("failed to update order status to failed: %v", updateOrderErr)
-			}
-			return orderID, customerrors.ErrOrderStatusFailed
+	err := s.txManager.WithRepeatableReadTx(ctx, func(c context.Context) error {
+		id, err := s.orderRepository.Create(c, userID, items)
+		if err != nil {
+			return err
 		}
-		reservedItems = append(reservedItems, item)
-	}
+		orderID = id
 
-	err = s.orderRepository.SetStatus(ctx, orderID, model.OrderStatusAwaitingPayment)
+		for _, item := range items {
+			if err := s.stockRepository.Reserve(c, item.SKU, item.Count); err != nil {
+				return err
+			}
+		}
+
+		if err := s.orderRepository.SetStatus(c, orderID, model.OrderStatusAwaitingPayment); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return orderID, err
+		if err := s.txManager.WithRepeatableReadTx(ctx, func(c context.Context) error {
+			return s.orderRepository.SetStatus(c, orderID, model.OrderStatusFailed)
+		}); err != nil {
+			log.Printf("failed to update order status to failed: %v", err)
+		}
+		return orderID, customerrors.ErrOrderStatusFailed
 	}
 
 	return orderID, nil

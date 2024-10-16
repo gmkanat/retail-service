@@ -3,27 +3,21 @@ package stock
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/jackc/pgx/v5"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/customerrors"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/transaction"
 	"log"
 )
 
 func (r *Repository) Release(ctx context.Context, sku uint32, count uint16) error {
-	writer, err := r.cluster.GetWriter(ctx)
-	if err != nil {
-		log.Printf("Failed to get writer: %v", err)
-		return err
+	tx, ok := transaction.GetTx(ctx)
+	if !ok {
+		return fmt.Errorf("transaction not found in context")
 	}
-
-	tx, err := writer.Begin(ctx)
-	if err != nil {
-		log.Printf("Failed to start transaction: %v", err)
-		return err
-	}
-	defer tx.Rollback(ctx)
 
 	var reserved uint64
-	err = tx.QueryRow(ctx, `
+	err := tx.QueryRow(ctx, `
 		SELECT reserved
 		FROM stocks.stocks
 		WHERE id = $1`, sku).Scan(&reserved)
@@ -44,15 +38,11 @@ func (r *Repository) Release(ctx context.Context, sku uint32, count uint16) erro
 
 	_, err = tx.Exec(ctx, `
 		UPDATE stocks.stocks
-		SET reserved = reserved - $1
+		SET reserved = reserved - $1,
+			available = available + $1
 		WHERE id = $2`, count, sku)
 	if err != nil {
 		log.Printf("Failed to update stock: %v", err)
-		return err
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		log.Printf("Failed to commit transaction: %v", err)
 		return err
 	}
 

@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/mocks/order"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/mocks/stock"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/mocks/transaction"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/model"
 	service "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/order"
 	"testing"
@@ -16,8 +17,9 @@ func TestService_OrderPay(t *testing.T) {
 
 	orderRepoMock := order.NewRepositoryMock(mc)
 	stockRepoMock := stock.NewRepositoryMock(mc)
+	txManagerMock := transaction.NewTransactionManagerMock(mc)
 
-	orderService := service.NewOrderService(orderRepoMock, stockRepoMock)
+	orderService := service.NewOrderService(orderRepoMock, stockRepoMock, txManagerMock)
 
 	ctx := context.Background()
 	orderID := int64(1)
@@ -32,6 +34,9 @@ func TestService_OrderPay(t *testing.T) {
 	}
 
 	t.Run("add item", func(t *testing.T) {
+		txManagerMock.WithRepeatableReadTxMock.Set(func(ctx context.Context, fn func(context.Context) error) error {
+			return fn(ctx)
+		})
 		orderRepoMock.CreateMock.Expect(ctx, userID, order.Items).Return(orderID, nil)
 		stockRepoMock.ReserveMock.Expect(ctx, order.Items[0].SKU, order.Items[0].Count).Return(nil)
 		orderRepoMock.SetStatusMock.Expect(ctx, orderID, model.OrderStatusAwaitingPayment).Return(nil)
@@ -41,6 +46,9 @@ func TestService_OrderPay(t *testing.T) {
 	})
 
 	t.Run("pay for order", func(t *testing.T) {
+		txManagerMock.WithRepeatableReadTxMock.Set(func(ctx context.Context, fn func(context.Context) error) error {
+			return fn(ctx)
+		})
 		orderRepoMock.GetByIDMock.Expect(ctx, orderID).Return(order, nil)
 		stockRepoMock.ReserveRemoveMock.Expect(ctx, order.Items[0].SKU, order.Items[0].Count).Return(nil)
 		orderRepoMock.SetStatusMock.Expect(ctx, orderID, model.OrderStatusPayed).Return(nil)

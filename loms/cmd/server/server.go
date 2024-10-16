@@ -2,27 +2,31 @@ package main
 
 import (
 	"context"
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/jackc/pgx/v5/pgxpool"
-	httpSwagger "github.com/swaggo/http-swagger"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/reflection"
 	"log"
 	"net"
 	"net/http"
+
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/reflection"
 
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/app"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/config"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/infra"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/pgcluster"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/transaction"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/middleware"
+
 	orderRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_raw/order"
 	outboxRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_raw/outbox"
 	stockRepository "gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_raw/stock"
 	orderService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/order"
 	outboxService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/outbox"
 	stockService "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/stock"
-	"gitlab.ozon.dev/kanat_9999/homework/loms/middleware"
+
+	httpSwagger "github.com/swaggo/http-swagger"
 	proto "gitlab.ozon.dev/kanat_9999/homework/loms/pkg/api/proto/v1"
 )
 
@@ -81,12 +85,13 @@ func setupServices(
 	stockRepo := stockRepository.NewRepository(cluster)
 	outboxRepo := outboxRepository.NewRepository(cluster, kafkaProducer)
 
-	outboxProcessor := outboxService.NewOutboxProcessor(outboxRepo, kafkaProducer, cfg.OutboxPollInterval)
+	txManager := transaction.NewTxManager(cluster)
+	outboxProcessor := outboxService.NewOutboxProcessor(outboxRepo, kafkaProducer, cfg.OutboxPollInterval, txManager)
 
-	orderSvc := orderService.NewOrderService(orderRepo, stockRepo)
+	orderSvc := orderService.NewOrderService(orderRepo, stockRepo, txManager)
 	stockSvc := stockService.NewStockService(stockRepo)
 
-	go outboxProcessor.Start(ctx)
+	go outboxProcessor.Start(ctx, cfg.BatchSize)
 
 	return app.NewService(orderSvc, stockSvc), func() {
 		outboxProcessor.Stop()
