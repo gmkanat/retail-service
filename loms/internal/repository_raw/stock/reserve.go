@@ -3,27 +3,21 @@ package stock
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/jackc/pgx/v5"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/customerrors"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/transaction"
 	"log"
 )
 
 func (r *Repository) Reserve(ctx context.Context, sku uint32, count uint16) error {
-	writer, err := r.cluster.GetWriter(ctx)
-	if err != nil {
-		log.Printf("Failed to get writer: %v", err)
-		return err
+	tx, ok := transaction.GetTx(ctx)
+	if !ok {
+		return fmt.Errorf("transaction not found in context")
 	}
-
-	tx, err := writer.Begin(ctx)
-	if err != nil {
-		log.Printf("Failed to start transaction: %v", err)
-		return err
-	}
-	defer tx.Rollback(ctx)
 
 	var available, reserved uint64
-	err = tx.QueryRow(ctx, `
+	err := tx.QueryRow(ctx, `
 		SELECT available, reserved
 		FROM stocks.stocks
 		WHERE id = $1`, sku).Scan(&available, &reserved)
@@ -46,10 +40,11 @@ func (r *Repository) Reserve(ctx context.Context, sku uint32, count uint16) erro
 		UPDATE stocks.stocks
 		SET available = available - $1, reserved = reserved + $1
 		WHERE id = $2`, count, sku)
+
 	if err != nil {
 		log.Printf("Failed to update stock: %v", err)
 		return err
 	}
 
-	return tx.Commit(ctx)
+	return nil
 }

@@ -2,12 +2,13 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/transaction"
 	"log"
 	"sync"
 	"time"
 
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/infra"
-	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/model"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/repository_raw/outbox"
 )
 
@@ -17,18 +18,25 @@ type OutboxProcessor struct {
 	pollInterval  time.Duration
 	stopCh        chan struct{}
 	wg            sync.WaitGroup
+	txManager     *transaction.TxManager
 }
 
-func NewOutboxProcessor(repo *outbox.Repository, kafkaProducer *infra.KafkaProducer, pollInterval time.Duration) *OutboxProcessor {
+func NewOutboxProcessor(
+	repo *outbox.Repository,
+	kafkaProducer *infra.KafkaProducer,
+	pollInterval time.Duration,
+	txManager *transaction.TxManager,
+) *OutboxProcessor {
 	return &OutboxProcessor{
 		repo:          repo,
 		kafkaProducer: kafkaProducer,
 		pollInterval:  pollInterval,
 		stopCh:        make(chan struct{}),
+		txManager:     txManager,
 	}
 }
 
-func (p *OutboxProcessor) Start(ctx context.Context) {
+func (p *OutboxProcessor) Start(ctx context.Context, batchSize int) {
 	p.wg.Add(1)
 	go func() {
 		defer p.wg.Done()
@@ -41,7 +49,9 @@ func (p *OutboxProcessor) Start(ctx context.Context) {
 				log.Println("stop signal received, stopping outbox processor...")
 				return
 			default:
-				p.processBatch(ctx)
+				if err := p.processBatch(ctx, batchSize); err != nil {
+					log.Printf("failed to process batch: %v", err)
+				}
 				time.Sleep(p.pollInterval)
 			}
 		}
@@ -54,21 +64,22 @@ func (p *OutboxProcessor) Stop() {
 	log.Println("outbox processor stopped")
 }
 
-func (p *OutboxProcessor) processBatch(ctx context.Context) {
-	events, err := p.repo.FetchNextBatch(ctx, 10)
-	if err != nil {
-		log.Printf("error fetching events from outbox: %v", err)
-		return
-	}
-
-	for _, event := range events {
-		if err := p.kafkaProducer.SendEvent(ctx, event); err != nil {
-			log.Printf("failed to send event to Kafka: %v", err)
-			continue
+func (p *OutboxProcessor) processBatch(ctx context.Context, batchSize int) error {
+	return p.txManager.WithRepeatableReadTx(ctx, func(c context.Context) error {
+		events, err := p.repo.FetchAndMarkBatch(c, batchSize)
+		if err != nil {
+			return fmt.Errorf("fetch and mark batch: %w", err)
 		}
 
-		if err := p.repo.MarkAsSent(ctx, []*model.Event{event}); err != nil {
-			log.Printf("failed to mark event as sent: %v", err)
+		if len(events) == 0 {
+			return nil
 		}
-	}
+
+		for _, event := range events {
+			if err := p.kafkaProducer.SendEvent(c, event); err != nil {
+				return fmt.Errorf("send event to Kafka: %w", err)
+			}
+		}
+		return nil
+	})
 }

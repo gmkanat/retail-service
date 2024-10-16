@@ -2,31 +2,21 @@ package order
 
 import (
 	"context"
+	"fmt"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/model"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/transaction"
 	"log"
 	"time"
 )
 
 func (r *Repository) Create(ctx context.Context, userID int64, items []model.Item) (int64, error) {
-	writer, err := r.cluster.GetWriter(ctx)
-	if err != nil {
-		log.Printf("Failed to get writer: %v", err)
-		return 0, err
+	tx, ok := transaction.GetTx(ctx)
+	if !ok {
+		return 0, fmt.Errorf("transaction not found in context")
 	}
-
-	tx, err := writer.Begin(ctx)
-	if err != nil {
-		log.Printf("failed to begin transaction: %v", err)
-		return 0, err
-	}
-	defer func() {
-		if err := tx.Rollback(ctx); err != nil {
-			log.Printf("failed to rollback transaction: %v", err)
-		}
-	}()
 
 	var orderID int64
-	err = tx.QueryRow(ctx,
+	err := tx.QueryRow(ctx,
 		`INSERT INTO orders.orders (user_id, status, created_at, updated_at)
         VALUES ($1, $2, $3, $4) RETURNING id`,
 		userID, model.OrderStatusNew.String(), time.Now(), time.Now(),
@@ -48,16 +38,11 @@ func (r *Repository) Create(ctx context.Context, userID int64, items []model.Ite
 		}
 	}
 
-	if err = r.notifier.CreateEvent(ctx, tx, model.Event{
+	if err = r.notifier.CreateEvent(ctx, model.Event{
 		OrderID: orderID,
 		Status:  model.OrderStatusNew.String(),
 	}); err != nil {
 		log.Printf("failed to create event: %v", err)
-		return 0, err
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		log.Printf("failed to commit transaction: %v", err)
 		return 0, err
 	}
 

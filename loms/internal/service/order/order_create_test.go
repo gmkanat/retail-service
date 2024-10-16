@@ -7,6 +7,7 @@ import (
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/customerrors"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/mocks/order"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/mocks/stock"
+	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/mocks/transaction"
 	"gitlab.ozon.dev/kanat_9999/homework/loms/internal/model"
 	service "gitlab.ozon.dev/kanat_9999/homework/loms/internal/service/order"
 	"testing"
@@ -17,13 +18,14 @@ func TestService_OrderCreate(t *testing.T) {
 
 	orderRepoMock := order.NewRepositoryMock(mc)
 	stockRepoMock := stock.NewRepositoryMock(mc)
+	txManagerMock := transaction.NewTransactionManagerMock(mc)
 
-	orderService := service.NewOrderService(orderRepoMock, stockRepoMock)
+	orderService := service.NewOrderService(orderRepoMock, stockRepoMock, txManagerMock)
 
 	ctx := context.Background()
 	orderID := int64(1)
 	userID := int64(1)
-	order := &model.Order{
+	curOrder := &model.Order{
 		OrderID: orderID,
 		UserID:  userID,
 		Status:  model.OrderStatusAwaitingPayment,
@@ -33,12 +35,15 @@ func TestService_OrderCreate(t *testing.T) {
 	}
 
 	t.Run("add item", func(t *testing.T) {
-		orderRepoMock.CreateMock.Expect(ctx, userID, order.Items).Return(orderID, nil)
-		stockRepoMock.ReserveMock.Expect(ctx, order.Items[0].SKU, order.Items[0].Count).Return(nil)
+		txManagerMock.WithRepeatableReadTxMock.Set(func(ctx context.Context, fn func(context.Context) error) error {
+			return fn(ctx)
+		})
+		orderRepoMock.CreateMock.Expect(ctx, userID, curOrder.Items).Return(orderID, nil)
+		stockRepoMock.ReserveMock.Expect(ctx, curOrder.Items[0].SKU, curOrder.Items[0].Count).Return(nil)
 		orderRepoMock.SetStatusMock.Expect(ctx, orderID, model.OrderStatusAwaitingPayment).Return(nil)
-		createdOrderID, err := orderService.OrderCreate(ctx, order.UserID, order.Items)
+		createdOrderID, err := orderService.OrderCreate(ctx, curOrder.UserID, curOrder.Items)
 		require.NoError(t, err)
-		require.Equal(t, createdOrderID, order.OrderID)
+		require.Equal(t, createdOrderID, curOrder.OrderID)
 	})
 }
 
@@ -47,8 +52,9 @@ func TestService_OrderCreateError(t *testing.T) {
 
 	orderRepoMock := order.NewRepositoryMock(mc)
 	stockRepoMock := stock.NewRepositoryMock(mc)
+	txManagerMock := transaction.NewTransactionManagerMock(mc)
 
-	orderService := service.NewOrderService(orderRepoMock, stockRepoMock)
+	orderService := service.NewOrderService(orderRepoMock, stockRepoMock, txManagerMock)
 
 	ctx := context.Background()
 	orderID := int64(1)
@@ -63,6 +69,9 @@ func TestService_OrderCreateError(t *testing.T) {
 	}
 
 	t.Run("add item", func(t *testing.T) {
+		txManagerMock.WithRepeatableReadTxMock.Set(func(ctx context.Context, fn func(context.Context) error) error {
+			return fn(ctx)
+		})
 		orderRepoMock.CreateMock.Expect(ctx, userID, order.Items).Return(orderID, nil)
 		stockRepoMock.ReserveMock.Expect(ctx, order.Items[0].SKU, order.Items[0].Count).Return(customerrors.ErrOrderStatusFailed)
 		orderRepoMock.SetStatusMock.Expect(ctx, orderID, model.OrderStatusFailed).Return(nil)

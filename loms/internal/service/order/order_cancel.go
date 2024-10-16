@@ -16,21 +16,23 @@ func (s *Service) OrderCancel(ctx context.Context, orderID int64) error {
 		return err
 	}
 
-	if order.Status != model.OrderStatusAwaitingPayment {
-		return customerrors.ErrOrderStatusAwaitingPayment
-	}
-
-	for _, item := range order.Items {
-		releaseErr := s.stockRepository.Release(ctx, item.SKU, item.Count)
-		if releaseErr != nil {
-			return releaseErr
+	return s.txManager.WithRepeatableReadTx(ctx, func(c context.Context) error {
+		if order.Status != model.OrderStatusAwaitingPayment {
+			return customerrors.ErrOrderStatusAwaitingPayment
 		}
-	}
 
-	err = s.orderRepository.SetStatus(ctx, orderID, model.OrderStatusCancelled)
-	if err != nil {
-		return err
-	}
+		for _, item := range order.Items {
+			releaseErr := s.stockRepository.Release(c, item.SKU, item.Count)
+			if releaseErr != nil {
+				return releaseErr
+			}
+		}
 
-	return nil
+		err = s.orderRepository.SetStatus(c, orderID, model.OrderStatusCancelled)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 }

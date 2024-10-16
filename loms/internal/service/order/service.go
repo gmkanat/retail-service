@@ -17,14 +17,24 @@ type StockRepository interface {
 	ReserveRemove(ctx context.Context, sku uint32, count uint16) error
 }
 
+type TransactionManager interface {
+	WithRepeatableReadTx(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
 type Service struct {
 	orderRepository Repository
 	stockRepository StockRepository
+	txManager       TransactionManager
 }
 
-func NewOrderService(orderRepository Repository, stockRepository StockRepository) *Service {
+func NewOrderService(
+	orderRepository Repository,
+	stockRepository StockRepository,
+	txManager TransactionManager,
+) *Service {
 	return &Service{
 		orderRepository: orderRepository,
 		stockRepository: stockRepository,
+		txManager:       txManager,
 	}
 }
